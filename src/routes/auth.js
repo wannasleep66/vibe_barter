@@ -12,7 +12,13 @@ const {
   getMe,
   requestVerificationEmail,
   verifyEmail,
-  refreshToken
+  refreshToken,
+  googleAuth,
+  googleAuthCallback,
+  vkAuth,
+  vkAuthCallback,
+  yandexAuth,
+  yandexAuthCallback
 } = require('../controllers/authController');
 const {
   validateRegister,
@@ -43,5 +49,18 @@ router.get('/verify-email/:token', validateEmailVerificationToken, verifyEmail);
 
 // Refresh token route
 router.post('/refresh-token', refreshToken);
+
+// OAuth routes
+// Google
+router.get('/google', googleAuth);
+router.get('/google/callback', googleAuthCallback);
+
+// VK
+router.get('/vk', vkAuth);
+router.get('/vk/callback', vkAuthCallback);
+
+// Yandex
+router.get('/yandex', yandexAuth);
+router.get('/yandex/callback', yandexAuthCallback);
 
 module.exports = router;

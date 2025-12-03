@@ -329,6 +329,107 @@ exports.verifyEmail = async (req, res, next) => {
   }
 };
 
+const passport = require('passport');
+const { generateToken } = require('../utils/jwt');
+
+// Create JWT token for OAuth authenticated user
+const createOAuthToken = (user) => {
+  return generateToken(user._id, process.env.JWT_EXPIRES_IN || '15m');
+};
+
+// Google OAuth login
+exports.googleAuth = passport.authenticate('google', { scope: ['profile', 'email'] });
+
+exports.googleAuthCallback = async (req, res, next) => {
+  try {
+    // The user is already authenticated by Passport
+    if (!req.user) {
+      return next(new AppError('Authentication failed', 401));
+    }
+
+    const token = createOAuthToken(req.user);
+
+    // Remove password from output
+    req.user.password = undefined;
+
+    // Update last login time
+    req.user.lastLoginAt = Date.now();
+    await req.user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      token,
+      data: {
+        user: req.user
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// VK OAuth login
+exports.vkAuth = passport.authenticate('vkontakte', { scope: ['email'] });
+
+exports.vkAuthCallback = async (req, res, next) => {
+  try {
+    // The user is already authenticated by Passport
+    if (!req.user) {
+      return next(new AppError('Authentication failed', 401));
+    }
+
+    const token = createOAuthToken(req.user);
+
+    // Remove password from output
+    req.user.password = undefined;
+
+    // Update last login time
+    req.user.lastLoginAt = Date.now();
+    await req.user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      token,
+      data: {
+        user: req.user
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Yandex OAuth login
+exports.yandexAuth = passport.authenticate('yandex');
+
+exports.yandexAuthCallback = async (req, res, next) => {
+  try {
+    // The user is already authenticated by Passport
+    if (!req.user) {
+      return next(new AppError('Authentication failed', 401));
+    }
+
+    const token = createOAuthToken(req.user);
+
+    // Remove password from output
+    req.user.password = undefined;
+
+    // Update last login time
+    req.user.lastLoginAt = Date.now();
+    await req.user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      token,
+      data: {
+        user: req.user
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Refresh token functionality
 exports.refreshToken = async (req, res, next) => {
   try {

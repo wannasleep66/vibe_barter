@@ -57,6 +57,18 @@ const userSchema = new mongoose.Schema({
   profile: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Profile'
+  },
+  // OAuth fields
+  oauth: {
+    googleId: String,
+    googleAccessToken: String,
+    googleRefreshToken: String,
+    vkId: String,
+    vkAccessToken: String,
+    vkRefreshToken: String,
+    yandexId: String,
+    yandexAccessToken: String,
+    yandexRefreshToken: String
   }
 }, {
   timestamps: true // Adds createdAt and updatedAt fields

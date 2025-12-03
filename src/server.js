@@ -4,8 +4,13 @@ const cors = require('cors');
 const helmet = require('helmet');
 const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
+const session = require('express-session');
+const passport = require('passport');
 const path = require('path');
 require('dotenv').config();
+
+// Initialize Passport configuration
+const passportConfig = require('./config/passport');
 
 const { logger } = require('./logger/logger');
 const errorHandler = require('./middleware/errorHandler');
@@ -35,6 +40,21 @@ app.use(cors({
   origin: process.env.APP_URL || 'http://localhost:3000',
   credentials: true
 }));
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your_session_secret_here',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // Set to true in production when using HTTPS
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Serve static files from frontend/public
 app.use(express.static(path.join(__dirname, '../frontend/public')));

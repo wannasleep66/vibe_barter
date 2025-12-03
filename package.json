@@ -34,7 +34,13 @@
     "helmet": "^7.0.0",
     "express-rate-limit": "^6.10.0",
     "joi": "^17.9.2",
-    "winston": "^3.10.0"
+    "winston": "^3.10.0",
+    "passport": "^0.6.0",
+    "passport-google-oauth20": "^2.0.0",
+    "passport-vkontakte": "^0.5.0",
+    "passport-yandex": "^0.4.0",
+    "express-session": "^1.17.3",
+    "passport-oauth2": "^1.7.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1",
