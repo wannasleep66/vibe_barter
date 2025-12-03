@@ -18,6 +18,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const sessionRoutes = require('./routes/session');
 const roleRoutes = require('./routes/roles');
+const permissionRoutes = require('./routes/permissions');
 const rbacService = require('./services/RbacService');
 
 const app = express();
@@ -73,6 +74,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/roles', roleRoutes);
+app.use('/api/permissions', permissionRoutes);
 
 // Serve registration page
 app.get('/register', (req, res) => {
