@@ -235,5 +235,112 @@ module.exports = {
     }
 
     next();
+  },
+
+  validateAddPortfolioItem: (req, res, next) => {
+    const { title, description, url, media } = req.body;
+
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title is required and must be a non-empty string'
+      });
+    }
+
+    if (description !== undefined && typeof description !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Description must be a string if provided'
+      });
+    }
+
+    if (url && (typeof url !== 'string' || !isValidUrl(url))) {
+      return res.status(400).json({
+        success: false,
+        message: 'URL must be a valid URL string if provided'
+      });
+    }
+
+    if (media && !Array.isArray(media)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Media must be an array of URLs if provided'
+      });
+    }
+
+    if (media && Array.isArray(media)) {
+      for (const item of media) {
+        if (typeof item !== 'string' || !isValidUrl(item)) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid URL in media array: ${item}`
+          });
+        }
+      }
+    }
+
+    next();
+  },
+
+  validateUpdatePortfolioItem: (req, res, next) => {
+    const { currentTitle, newTitle, description, url, media } = req.body;
+
+    if (!currentTitle || typeof currentTitle !== 'string' || currentTitle.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current title is required and must be a non-empty string'
+      });
+    }
+
+    if (newTitle && (typeof newTitle !== 'string' || newTitle.trim().length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'New title must be a non-empty string if provided'
+      });
+    }
+
+    if (description !== undefined && typeof description !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Description must be a string if provided'
+      });
+    }
+
+    if (url !== undefined && url !== null && (typeof url !== 'string' || !isValidUrl(url))) {
+      return res.status(400).json({
+        success: false,
+        message: 'URL must be a valid URL string if provided'
+      });
+    }
+
+    if (media !== undefined && !Array.isArray(media)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Media must be an array of URLs if provided'
+      });
+    }
+
+    if (media && Array.isArray(media)) {
+      for (const item of media) {
+        if (typeof item !== 'string' || !isValidUrl(item)) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid URL in media array: ${item}`
+          });
+        }
+      }
+    }
+
+    next();
   }
 };
+
+// Helper function to validate URL
+function isValidUrl(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}

@@ -1119,6 +1119,366 @@ class ProfileController {
       });
     }
   }
+
+  // Add a portfolio item to profile
+  static async addPortfolioItem(req, res) {
+    try {
+      const { title, description, url, media } = req.body;
+
+      // Validate title input
+      if (!title || typeof title !== 'string' || title.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Title is required and must be a non-empty string'
+        });
+      }
+
+      const trimmedTitle = title.trim();
+
+      // Validate description if provided
+      let validatedDescription = '';
+      if (description !== undefined) {
+        if (typeof description !== 'string') {
+          return res.status(400).json({
+            success: false,
+            message: 'Description must be a string if provided'
+          });
+        }
+        validatedDescription = description;
+      }
+
+      // Validate url if provided
+      let validatedUrl = null;
+      if (url) {
+        if (typeof url !== 'string') {
+          return res.status(400).json({
+            success: false,
+            message: 'URL must be a string if provided'
+          });
+        }
+        try {
+          new URL(url); // Validate URL format
+          validatedUrl = url;
+        } catch (e) {
+          return res.status(400).json({
+            success: false,
+            message: 'URL must be a valid URL if provided'
+          });
+        }
+      }
+
+      // Validate media if provided
+      let validatedMedia = [];
+      if (media) {
+        if (!Array.isArray(media)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Media must be an array of URLs if provided'
+          });
+        }
+
+        for (const item of media) {
+          if (typeof item !== 'string') {
+            return res.status(400).json({
+              success: false,
+              message: 'Media array must contain only string URLs'
+            });
+          }
+          try {
+            new URL(item); // Validate URL format
+          } catch (e) {
+            return res.status(400).json({
+              success: false,
+              message: `Invalid URL in media array: ${item}`
+            });
+          }
+        }
+        validatedMedia = media;
+      }
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Check if portfolio item with same title already exists
+      const existingPortfolio = profile.portfolio.find(item =>
+        item.title.toLowerCase() === trimmedTitle.toLowerCase()
+      );
+      if (existingPortfolio) {
+        return res.status(400).json({
+          success: false,
+          message: 'Portfolio item with this title already exists in profile'
+        });
+      }
+
+      // Add portfolio item to profile
+      profile.portfolio.push({
+        title: trimmedTitle,
+        description: validatedDescription,
+        url: validatedUrl,
+        media: validatedMedia
+      });
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Portfolio item added successfully',
+        data: {
+          portfolio: profile.portfolio
+        }
+      });
+    } catch (error) {
+      logger.error(`Error adding portfolio item: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error adding portfolio item',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Get all portfolio items from profile
+  static async getPortfolio(req, res) {
+    try {
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          portfolio: profile.portfolio
+        }
+      });
+    } catch (error) {
+      logger.error(`Error getting portfolio: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving portfolio',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Update a portfolio item in profile
+  static async updatePortfolioItem(req, res) {
+    try {
+      const { currentTitle, newTitle, description, url, media } = req.body;
+
+      // Validate current title input
+      if (!currentTitle || typeof currentTitle !== 'string' || currentTitle.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current title is required and must be a non-empty string'
+        });
+      }
+
+      const currentTrimmedTitle = currentTitle.trim();
+      let validatedNewTitle = currentTrimmedTitle; // Default to current title
+
+      // Validate new title if provided
+      if (newTitle) {
+        if (typeof newTitle !== 'string' || newTitle.trim().length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'New title must be a non-empty string if provided'
+          });
+        }
+        validatedNewTitle = newTitle.trim();
+      }
+
+      // Validate description if provided
+      let validatedDescription = undefined;
+      if (description !== undefined) {
+        if (typeof description !== 'string') {
+          return res.status(400).json({
+            success: false,
+            message: 'Description must be a string if provided'
+          });
+        }
+        validatedDescription = description;
+      }
+
+      // Validate url if provided
+      let validatedUrl = undefined;
+      if (url !== undefined) {
+        if (url) { // If url is provided and not null/empty
+          if (typeof url !== 'string') {
+            return res.status(400).json({
+              success: false,
+              message: 'URL must be a string if provided'
+            });
+          }
+          try {
+            new URL(url); // Validate URL format
+          } catch (e) {
+            return res.status(400).json({
+              success: false,
+              message: 'URL must be a valid URL if provided'
+            });
+          }
+          validatedUrl = url;
+        } else {
+          validatedUrl = null; // Allow setting to null
+        }
+      }
+
+      // Validate media if provided
+      let validatedMedia = undefined;
+      if (media !== undefined) {
+        if (!Array.isArray(media)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Media must be an array of URLs if provided'
+          });
+        }
+
+        for (const item of media) {
+          if (typeof item !== 'string') {
+            return res.status(400).json({
+              success: false,
+              message: 'Media array must contain only string URLs'
+            });
+          }
+          try {
+            new URL(item); // Validate URL format
+          } catch (e) {
+            return res.status(400).json({
+              success: false,
+              message: `Invalid URL in media array: ${item}`
+            });
+          }
+        }
+        validatedMedia = media;
+      }
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Find the portfolio item to update
+      const portfolioIndex = profile.portfolio.findIndex(item =>
+        item.title.toLowerCase() === currentTrimmedTitle.toLowerCase()
+      );
+      if (portfolioIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Portfolio item not found in profile'
+        });
+      }
+
+      // If updating to a new title, check if it already exists
+      if (validatedNewTitle !== currentTrimmedTitle) {
+        const existingItem = profile.portfolio.find((item, index) =>
+          item.title.toLowerCase() === validatedNewTitle.toLowerCase() &&
+          index !== portfolioIndex
+        );
+        if (existingItem) {
+          return res.status(400).json({
+            success: false,
+            message: 'Portfolio item with this title already exists in profile'
+          });
+        }
+      }
+
+      // Update the portfolio item
+      if (validatedNewTitle !== currentTrimmedTitle) {
+        profile.portfolio[portfolioIndex].title = validatedNewTitle;
+      }
+      if (validatedDescription !== undefined) {
+        profile.portfolio[portfolioIndex].description = validatedDescription;
+      }
+      if (validatedUrl !== undefined) {
+        profile.portfolio[portfolioIndex].url = validatedUrl;
+      }
+      if (validatedMedia !== undefined) {
+        profile.portfolio[portfolioIndex].media = validatedMedia;
+      }
+
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Portfolio item updated successfully',
+        data: {
+          portfolio: profile.portfolio
+        }
+      });
+    } catch (error) {
+      logger.error(`Error updating portfolio item: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error updating portfolio item',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Remove a portfolio item from profile
+  static async removePortfolioItem(req, res) {
+    try {
+      const { title } = req.params;
+
+      if (!title || title.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Title is required'
+        });
+      }
+
+      const trimmedTitle = title.trim();
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Find the portfolio item to remove
+      const portfolioIndex = profile.portfolio.findIndex(item =>
+        item.title.toLowerCase() === trimmedTitle.toLowerCase()
+      );
+      if (portfolioIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Portfolio item not found in profile'
+        });
+      }
+
+      // Remove the portfolio item
+      profile.portfolio.splice(portfolioIndex, 1);
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Portfolio item removed successfully',
+        data: {
+          portfolio: profile.portfolio
+        }
+      });
+    } catch (error) {
+      logger.error(`Error removing portfolio item: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error removing portfolio item',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
 }
 
 module.exports = ProfileController;

@@ -56,4 +56,10 @@ router.get('/contacts', ProfileController.getContacts);
 router.put('/contacts', require('../middleware/profileValidation').validateUpdateContact, ProfileController.updateContact);
 router.delete('/contacts', ProfileController.removeContact);
 
+// Portfolio routes - all protected
+router.post('/portfolio', require('../middleware/profileValidation').validateAddPortfolioItem, ProfileController.addPortfolioItem);
+router.get('/portfolio', ProfileController.getPortfolio);
+router.put('/portfolio', require('../middleware/profileValidation').validateUpdatePortfolioItem, ProfileController.updatePortfolioItem);
+router.delete('/portfolio/:title', ProfileController.removePortfolioItem);
+
 module.exports = router;
