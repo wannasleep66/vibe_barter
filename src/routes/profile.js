@@ -44,4 +44,10 @@ router.get('/skills', ProfileController.getSkills);
 router.put('/skills', require('../middleware/profileValidation').validateUpdateSkill, ProfileController.updateSkill);
 router.delete('/skills/:skill', ProfileController.removeSkill);
 
+// Languages routes - all protected
+router.post('/languages', require('../middleware/profileValidation').validateAddLanguage, ProfileController.addLanguage);
+router.get('/languages', ProfileController.getLanguages);
+router.put('/languages', require('../middleware/profileValidation').validateUpdateLanguage, ProfileController.updateLanguage);
+router.delete('/languages/:language', ProfileController.removeLanguage);
+
 module.exports = router;

@@ -130,5 +130,54 @@ module.exports = {
     }
 
     next();
+  },
+
+  validateAddLanguage: (req, res, next) => {
+    const { language, level } = req.body;
+
+    if (!language || typeof language !== 'string' || language.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Language is required and must be a non-empty string'
+      });
+    }
+
+    const validLevels = ['beginner', 'intermediate', 'advanced', 'fluent', 'native'];
+    if (level && (!validLevels.includes(level.toLowerCase()))) {
+      return res.status(400).json({
+        success: false,
+        message: `Level must be one of: ${validLevels.join(', ')}`
+      });
+    }
+
+    next();
+  },
+
+  validateUpdateLanguage: (req, res, next) => {
+    const { language, newLanguage, newLevel } = req.body;
+
+    if (!language || typeof language !== 'string' || language.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Language name is required and must be a non-empty string'
+      });
+    }
+
+    const validLevels = ['beginner', 'intermediate', 'advanced', 'fluent', 'native'];
+    if (newLanguage && (typeof newLanguage !== 'string' || newLanguage.trim().length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'New language must be a non-empty string if provided'
+      });
+    }
+
+    if (newLevel && !validLevels.includes(newLevel.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: `Level must be one of: ${validLevels.join(', ')}`
+      });
+    }
+
+    next();
   }
 };

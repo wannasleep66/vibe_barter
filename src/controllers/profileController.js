@@ -594,6 +594,258 @@ class ProfileController {
       });
     }
   }
+
+  // Add a language to profile
+  static async addLanguage(req, res) {
+    try {
+      const { language, level } = req.body;
+
+      // Validate language input
+      if (!language || typeof language !== 'string' || language.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Language is required and must be a non-empty string'
+        });
+      }
+
+      const trimmedLanguage = language.trim();
+
+      // Validate level if provided
+      const validLevels = ['beginner', 'intermediate', 'advanced', 'fluent', 'native'];
+      let validatedLevel = 'intermediate'; // default
+      if (level) {
+        if (typeof level !== 'string' || !validLevels.includes(level.toLowerCase())) {
+          return res.status(400).json({
+            success: false,
+            message: `Level must be one of: ${validLevels.join(', ')}`
+          });
+        }
+        validatedLevel = level.toLowerCase();
+      }
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Check if language already exists
+      const existingLanguage = profile.languages.find(lang =>
+        lang.language.toLowerCase() === trimmedLanguage.toLowerCase()
+      );
+      if (existingLanguage) {
+        return res.status(400).json({
+          success: false,
+          message: 'Language already exists in profile'
+        });
+      }
+
+      // Add language to profile
+      profile.languages.push({
+        language: trimmedLanguage,
+        level: validatedLevel
+      });
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Language added successfully',
+        data: {
+          languages: profile.languages
+        }
+      });
+    } catch (error) {
+      logger.error(`Error adding language: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error adding language',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Get all languages from profile
+  static async getLanguages(req, res) {
+    try {
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          languages: profile.languages
+        }
+      });
+    } catch (error) {
+      logger.error(`Error getting languages: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving languages',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Update a language in profile
+  static async updateLanguage(req, res) {
+    try {
+      const { language, newLanguage, newLevel } = req.body;
+
+      // Validate inputs
+      if (!language || typeof language !== 'string' || language.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Language is required and must be a non-empty string'
+        });
+      }
+
+      const trimmedLanguage = language.trim();
+      let trimmedNewLanguage = trimmedLanguage; // If not provided, keep the same language
+
+      // Validate new language if provided
+      if (newLanguage) {
+        if (typeof newLanguage !== 'string' || newLanguage.trim().length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'New language must be a non-empty string if provided'
+          });
+        }
+        trimmedNewLanguage = newLanguage.trim();
+      }
+
+      // Validate level if provided
+      const validLevels = ['beginner', 'intermediate', 'advanced', 'fluent', 'native'];
+      let validatedNewLevel = null;
+      if (newLevel) {
+        if (typeof newLevel !== 'string' || !validLevels.includes(newLevel.toLowerCase())) {
+          return res.status(400).json({
+            success: false,
+            message: `Level must be one of: ${validLevels.join(', ')}`
+          });
+        }
+        validatedNewLevel = newLevel.toLowerCase();
+      }
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Find the language to update
+      const languageIndex = profile.languages.findIndex(lang =>
+        lang.language.toLowerCase() === trimmedLanguage.toLowerCase()
+      );
+      if (languageIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Language not found in profile'
+        });
+      }
+
+      // If updating to a new language name, check if it already exists
+      if (trimmedNewLanguage !== trimmedLanguage) {
+        const existingLanguage = profile.languages.find((lang, index) =>
+          lang.language.toLowerCase() === trimmedNewLanguage.toLowerCase() &&
+          index !== languageIndex
+        );
+        if (existingLanguage) {
+          return res.status(400).json({
+            success: false,
+            message: 'New language name already exists in profile'
+          });
+        }
+      }
+
+      // Update the language
+      if (trimmedNewLanguage !== trimmedLanguage) {
+        profile.languages[languageIndex].language = trimmedNewLanguage;
+      }
+      if (validatedNewLevel) {
+        profile.languages[languageIndex].level = validatedNewLevel;
+      }
+
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Language updated successfully',
+        data: {
+          languages: profile.languages
+        }
+      });
+    } catch (error) {
+      logger.error(`Error updating language: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error updating language',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Remove a language from profile
+  static async removeLanguage(req, res) {
+    try {
+      const { language } = req.params;
+
+      if (!language || language.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Language is required'
+        });
+      }
+
+      const trimmedLanguage = language.trim();
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Find the language to remove
+      const languageIndex = profile.languages.findIndex(lang =>
+        lang.language.toLowerCase() === trimmedLanguage.toLowerCase()
+      );
+      if (languageIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Language not found in profile'
+        });
+      }
+
+      // Remove the language
+      profile.languages.splice(languageIndex, 1);
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Language removed successfully',
+        data: {
+          languages: profile.languages
+        }
+      });
+    } catch (error) {
+      logger.error(`Error removing language: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error removing language',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
 }
 
 module.exports = ProfileController;
