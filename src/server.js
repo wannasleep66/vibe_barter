@@ -17,6 +17,8 @@ const errorHandler = require('./middleware/errorHandler');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const sessionRoutes = require('./routes/session');
+const roleRoutes = require('./routes/roles');
+const rbacService = require('./services/RbacService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -70,6 +72,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/roles', roleRoutes);
 
 // Serve registration page
 app.get('/register', (req, res) => {
@@ -91,6 +94,11 @@ app.get('/sessions', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/public/session-management.html'));
 });
 
+// Serve role management page
+app.get('/admin/roles', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/public/role-management.html'));
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -104,8 +112,17 @@ mongoose.connect(process.env.DB_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => {
+.then(async () => {
   logger.info('Connected to MongoDB');
+
+  try {
+    // Initialize default roles and permissions
+    await rbacService.createDefaultRolesAndPermissions();
+    logger.info('Default roles and permissions initialized');
+  } catch (initError) {
+    logger.error('Error initializing default roles and permissions:', initError);
+  }
+
   app.listen(PORT, () => {
     logger.info(`Server running on port ${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV}`);
