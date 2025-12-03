@@ -38,4 +38,10 @@ router.post('/photo', fileHandler.createProfilePhotoUploadMiddleware('photo'), P
 // Remove profile photo
 router.delete('/photo', ProfileController.removeProfilePhoto);
 
+// Skills routes - all protected
+router.post('/skills', require('../middleware/profileValidation').validateAddSkill, ProfileController.addSkill);
+router.get('/skills', ProfileController.getSkills);
+router.put('/skills', require('../middleware/profileValidation').validateUpdateSkill, ProfileController.updateSkill);
+router.delete('/skills/:skill', ProfileController.removeSkill);
+
 module.exports = router;

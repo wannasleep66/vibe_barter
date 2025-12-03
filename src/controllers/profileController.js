@@ -378,6 +378,222 @@ class ProfileController {
       });
     }
   }
+
+  // Add a skill to profile
+  static async addSkill(req, res) {
+    try {
+      const { skill } = req.body;
+
+      // Validate skill input
+      if (!skill || typeof skill !== 'string' || skill.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Skill is required and must be a non-empty string'
+        });
+      }
+
+      const trimmedSkill = skill.trim();
+
+      // Validate skill length
+      if (trimmedSkill.length > 50) {
+        return res.status(400).json({
+          success: false,
+          message: 'Skill name cannot exceed 50 characters'
+        });
+      }
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Check if skill already exists
+      if (profile.skills.includes(trimmedSkill)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Skill already exists in profile'
+        });
+      }
+
+      // Add skill to profile
+      profile.skills.push(trimmedSkill);
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Skill added successfully',
+        data: {
+          skills: profile.skills
+        }
+      });
+    } catch (error) {
+      logger.error(`Error adding skill: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error adding skill',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Get all skills from profile
+  static async getSkills(req, res) {
+    try {
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          skills: profile.skills
+        }
+      });
+    } catch (error) {
+      logger.error(`Error getting skills: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving skills',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Update a skill in profile (rename skill)
+  static async updateSkill(req, res) {
+    try {
+      const { oldSkill, newSkill } = req.body;
+
+      // Validate inputs
+      if (!oldSkill || typeof oldSkill !== 'string' || oldSkill.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Old skill name is required and must be a non-empty string'
+        });
+      }
+
+      if (!newSkill || typeof newSkill !== 'string' || newSkill.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'New skill name is required and must be a non-empty string'
+        });
+      }
+
+      const trimmedOldSkill = oldSkill.trim();
+      const trimmedNewSkill = newSkill.trim();
+
+      // Validate new skill length
+      if (trimmedNewSkill.length > 50) {
+        return res.status(400).json({
+          success: false,
+          message: 'New skill name cannot exceed 50 characters'
+        });
+      }
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Check if old skill exists
+      const oldSkillIndex = profile.skills.findIndex(skill => skill.toLowerCase() === trimmedOldSkill.toLowerCase());
+      if (oldSkillIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Skill not found in profile'
+        });
+      }
+
+      // Check if new skill already exists
+      if (profile.skills.includes(trimmedNewSkill)) {
+        return res.status(400).json({
+          success: false,
+          message: 'New skill name already exists in profile'
+        });
+      }
+
+      // Update the skill
+      profile.skills[oldSkillIndex] = trimmedNewSkill;
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Skill updated successfully',
+        data: {
+          skills: profile.skills
+        }
+      });
+    } catch (error) {
+      logger.error(`Error updating skill: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error updating skill',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Remove a skill from profile
+  static async removeSkill(req, res) {
+    try {
+      const { skill } = req.params;
+
+      if (!skill || skill.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Skill name is required'
+        });
+      }
+
+      const trimmedSkill = skill.trim();
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Check if skill exists
+      const skillIndex = profile.skills.findIndex(s => s.toLowerCase() === trimmedSkill.toLowerCase());
+      if (skillIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Skill not found in profile'
+        });
+      }
+
+      // Remove the skill
+      profile.skills.splice(skillIndex, 1);
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Skill removed successfully',
+        data: {
+          skills: profile.skills
+        }
+      });
+    } catch (error) {
+      logger.error(`Error removing skill: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error removing skill',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
 }
 
 module.exports = ProfileController;

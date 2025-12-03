@@ -83,5 +83,52 @@ module.exports = {
       });
     }
     next();
+  },
+
+  validateAddSkill: (req, res, next) => {
+    const { skill } = req.body;
+
+    if (!skill || typeof skill !== 'string' || skill.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Skill is required and must be a non-empty string'
+      });
+    }
+
+    if (skill.trim().length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'Skill name cannot exceed 50 characters'
+      });
+    }
+
+    next();
+  },
+
+  validateUpdateSkill: (req, res, next) => {
+    const { oldSkill, newSkill } = req.body;
+
+    if (!oldSkill || typeof oldSkill !== 'string' || oldSkill.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Old skill name is required and must be a non-empty string'
+      });
+    }
+
+    if (!newSkill || typeof newSkill !== 'string' || newSkill.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'New skill name is required and must be a non-empty string'
+      });
+    }
+
+    if (newSkill.trim().length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'New skill name cannot exceed 50 characters'
+      });
+    }
+
+    next();
   }
 };
