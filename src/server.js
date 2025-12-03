@@ -20,6 +20,7 @@ const sessionRoutes = require('./routes/session');
 const roleRoutes = require('./routes/roles');
 const permissionRoutes = require('./routes/permissions');
 const fileRoutes = require('./routes/files');
+const profileRoutes = require('./routes/profile');
 const rbacService = require('./services/RbacService');
 
 const app = express();
@@ -77,6 +78,7 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Serve uploaded files statically
 app.use('/uploads', express.static('uploads'));
