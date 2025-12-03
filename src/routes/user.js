@@ -2,21 +2,23 @@
 const express = require('express');
 const userController = require('../controllers/userController');
 const auth = require('../middleware/auth');
+const { validateCreateUser, validateUpdateUser, validateUserId, validateGetUsers } = require('../middleware/validation/userValidation');
 
 const router = express.Router();
 
-// Apply authentication middleware to all routes except get all and get by ID
+// Apply authentication middleware to all routes
 router.use(auth.protect);
 
 // Restrict certain routes to admin users only
 router.use(auth.restrictTo('admin'));
 
 router.route('/')
-  .get(userController.getAllUsers);
+  .get(validateGetUsers, userController.getAllUsers)
+  .post(validateCreateUser, userController.createUser); // Add CREATE endpoint
 
 router.route('/:id')
-  .get(userController.getUserById)
-  .patch(userController.updateUser)
-  .delete(userController.deleteUser);
+  .get(validateUserId, userController.getUserById)
+  .patch(validateUserId, validateUpdateUser, userController.updateUser)
+  .delete(validateUserId, userController.deleteUser);
 
 module.exports = router;

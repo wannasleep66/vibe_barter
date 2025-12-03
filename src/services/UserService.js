@@ -88,9 +88,9 @@ class UserService {
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 });
-      
+
       const total = await User.countDocuments();
-      
+
       return {
         users,
         pagination: {
@@ -102,6 +102,33 @@ class UserService {
       };
     } catch (error) {
       logger.error('Error getting all users:', error.message);
+      throw new AppError('Error retrieving users', 500);
+    }
+  },
+
+  // Get filtered users with pagination
+  async getFilteredUsers(filter = {}, page = 1, limit = 10) {
+    try {
+      const skip = (page - 1) * limit;
+      const users = await User.find(filter)
+        .populate('profile')
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 });
+
+      const total = await User.countDocuments(filter);
+
+      return {
+        users,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      logger.error('Error getting filtered users:', error.message);
       throw new AppError('Error retrieving users', 500);
     }
   }
