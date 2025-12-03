@@ -129,15 +129,15 @@ class RbacService {
         if (!role) {
           // Get permission IDs
           let permissionIds = [];
-          
+
           if (roleData.permissions.includes('*')) {
             // If this is the admin role with wildcard, assign all permissions
             const allPerms = await Permission.find({});
             permissionIds = allPerms.map(p => p._id);
           } else {
             // Find specific permissions by name
-            const perms = await Permission.find({ 
-              name: { $in: roleData.permissions } 
+            const perms = await Permission.find({
+              name: { $in: roleData.permissions }
             });
             permissionIds = perms.map(p => p._id);
           }
@@ -148,17 +148,17 @@ class RbacService {
             permissions: permissionIds,
             systemRole: roleData.systemRole
           });
-          
+
           logger.info(`Created role: ${roleData.name} with ${permissionIds.length} permissions`);
         } else {
           // If role exists but lacks some permissions, add them
           const permDocs = await Permission.find({ name: { $in: roleData.permissions } });
           const permIds = permDocs.map(p => p._id);
-          
-          role.permissions.push(...permIds.filter(permId => 
+
+          role.permissions.push(...permIds.filter(permId =>
             !role.permissions.some(existingPermId => existingPermId.toString() === permId.toString())
           ));
-          
+
           await role.save();
           logger.info(`Updated role: ${roleData.name} with additional permissions`);
         }
