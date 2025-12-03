@@ -50,4 +50,10 @@ router.get('/languages', ProfileController.getLanguages);
 router.put('/languages', require('../middleware/profileValidation').validateUpdateLanguage, ProfileController.updateLanguage);
 router.delete('/languages/:language', ProfileController.removeLanguage);
 
+// Contacts routes - all protected
+router.post('/contacts', require('../middleware/profileValidation').validateAddContact, ProfileController.addContact);
+router.get('/contacts', ProfileController.getContacts);
+router.put('/contacts', require('../middleware/profileValidation').validateUpdateContact, ProfileController.updateContact);
+router.delete('/contacts', ProfileController.removeContact);
+
 module.exports = router;

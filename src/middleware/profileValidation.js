@@ -179,5 +179,61 @@ module.exports = {
     }
 
     next();
+  },
+
+  validateAddContact: (req, res, next) => {
+    const { type, value } = req.body;
+
+    const validContactTypes = ['email', 'phone', 'website', 'social'];
+    if (!type || typeof type !== 'string' || !validContactTypes.includes(type.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: `Contact type is required and must be one of: ${validContactTypes.join(', ')}`
+      });
+    }
+
+    if (!value || typeof value !== 'string' || value.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Contact value is required and must be a non-empty string'
+      });
+    }
+
+    next();
+  },
+
+  validateUpdateContact: (req, res, next) => {
+    const { currentType, currentValue, newType, newValue } = req.body;
+
+    const validContactTypes = ['email', 'phone', 'website', 'social'];
+    if (!currentType || typeof currentType !== 'string' || !validContactTypes.includes(currentType.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: `Current contact type is required and must be one of: ${validContactTypes.join(', ')}`
+      });
+    }
+
+    if (!currentValue || typeof currentValue !== 'string' || currentValue.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current contact value is required and must be a non-empty string'
+      });
+    }
+
+    if (newType && (typeof newType !== 'string' || !validContactTypes.includes(newType.toLowerCase()))) {
+      return res.status(400).json({
+        success: false,
+        message: `New contact type must be one of: ${validContactTypes.join(', ')}`
+      });
+    }
+
+    if (newValue !== undefined && (typeof newValue !== 'string' || newValue.trim().length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'New contact value must be a non-empty string'
+      });
+    }
+
+    next();
   }
 };

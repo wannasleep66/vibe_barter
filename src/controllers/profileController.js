@@ -846,6 +846,279 @@ class ProfileController {
       });
     }
   }
+
+  // Add a contact to profile
+  static async addContact(req, res) {
+    try {
+      const { type, value } = req.body;
+
+      // Validate type input
+      const validContactTypes = ['email', 'phone', 'website', 'social'];
+      if (!type || typeof type !== 'string' || !validContactTypes.includes(type.toLowerCase())) {
+        return res.status(400).json({
+          success: false,
+          message: `Contact type is required and must be one of: ${validContactTypes.join(', ')}`
+        });
+      }
+
+      const validatedType = type.toLowerCase();
+
+      // Validate value input
+      if (!value || typeof value !== 'string' || value.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Contact value is required and must be a non-empty string'
+        });
+      }
+
+      const trimmedValue = value.trim();
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Check if contact with same type and value already exists
+      const existingContact = profile.contacts.find(contact =>
+        contact.type.toLowerCase() === validatedType.toLowerCase() &&
+        contact.value.toLowerCase() === trimmedValue.toLowerCase()
+      );
+      if (existingContact) {
+        return res.status(400).json({
+          success: false,
+          message: 'Contact with this type and value already exists in profile'
+        });
+      }
+
+      // Add contact to profile
+      profile.contacts.push({
+        type: validatedType,
+        value: trimmedValue
+      });
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Contact added successfully',
+        data: {
+          contacts: profile.contacts
+        }
+      });
+    } catch (error) {
+      logger.error(`Error adding contact: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error adding contact',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Get all contacts from profile
+  static async getContacts(req, res) {
+    try {
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          contacts: profile.contacts
+        }
+      });
+    } catch (error) {
+      logger.error(`Error getting contacts: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving contacts',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Update a contact in profile
+  static async updateContact(req, res) {
+    try {
+      const { currentType, currentValue, newType, newValue } = req.body;
+
+      // Validate current type
+      const validContactTypes = ['email', 'phone', 'website', 'social'];
+      if (!currentType || typeof currentType !== 'string' || !validContactTypes.includes(currentType.toLowerCase())) {
+        return res.status(400).json({
+          success: false,
+          message: `Current contact type is required and must be one of: ${validContactTypes.join(', ')}`
+        });
+      }
+
+      // Validate current value
+      if (!currentValue || typeof currentValue !== 'string' || currentValue.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current contact value is required and must be a non-empty string'
+        });
+      }
+
+      const currentValidatedType = currentType.toLowerCase();
+      const currentTrimmedValue = currentValue.trim();
+
+      // Validate new type if provided
+      let validatedNewType = currentValidatedType; // default to current type
+      if (newType) {
+        if (typeof newType !== 'string' || !validContactTypes.includes(newType.toLowerCase())) {
+          return res.status(400).json({
+            success: false,
+            message: `New contact type must be one of: ${validContactTypes.join(', ')}`
+          });
+        }
+        validatedNewType = newType.toLowerCase();
+      }
+
+      // Validate new value if provided
+      let validatedNewValue = currentTrimmedValue; // default to current value
+      if (newValue !== undefined) { // newValue can be an empty string
+        if (typeof newValue !== 'string') {
+          return res.status(400).json({
+            success: false,
+            message: 'New contact value must be a string'
+          });
+        }
+        validatedNewValue = newValue.trim();
+        if (validatedNewValue.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'New contact value cannot be empty'
+          });
+        }
+      }
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Find the contact to update
+      const contactIndex = profile.contacts.findIndex(contact =>
+        contact.type.toLowerCase() === currentValidatedType.toLowerCase() &&
+        contact.value.toLowerCase() === currentTrimmedValue.toLowerCase()
+      );
+      if (contactIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Contact not found in profile'
+        });
+      }
+
+      // Check if the new contact combination already exists
+      const existingContact = profile.contacts.find((contact, index) =>
+        contact.type.toLowerCase() === validatedNewType.toLowerCase() &&
+        contact.value.toLowerCase() === validatedNewValue.toLowerCase() &&
+        index !== contactIndex
+      );
+      if (existingContact) {
+        return res.status(400).json({
+          success: false,
+          message: 'A contact with this type and value already exists in profile'
+        });
+      }
+
+      // Update the contact
+      profile.contacts[contactIndex].type = validatedNewType;
+      profile.contacts[contactIndex].value = validatedNewValue;
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Contact updated successfully',
+        data: {
+          contacts: profile.contacts
+        }
+      });
+    } catch (error) {
+      logger.error(`Error updating contact: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error updating contact',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Remove a contact from profile
+  static async removeContact(req, res) {
+    try {
+      const { type, value } = req.query;
+
+      // Validate type input
+      const validContactTypes = ['email', 'phone', 'website', 'social'];
+      if (!type || typeof type !== 'string' || !validContactTypes.includes(type.toLowerCase())) {
+        return res.status(400).json({
+          success: false,
+          message: `Contact type is required and must be one of: ${validContactTypes.join(', ')}`
+        });
+      }
+
+      // Validate value input
+      if (!value || typeof value !== 'string' || value.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Contact value is required and must be a non-empty string'
+        });
+      }
+
+      const validatedType = type.toLowerCase();
+      const trimmedValue = value.trim();
+
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Find the contact to remove
+      const contactIndex = profile.contacts.findIndex(contact =>
+        contact.type.toLowerCase() === validatedType.toLowerCase() &&
+        contact.value.toLowerCase() === trimmedValue.toLowerCase()
+      );
+      if (contactIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Contact not found in profile'
+        });
+      }
+
+      // Remove the contact
+      profile.contacts.splice(contactIndex, 1);
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Contact removed successfully',
+        data: {
+          contacts: profile.contacts
+        }
+      });
+    } catch (error) {
+      logger.error(`Error removing contact: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error removing contact',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
 }
 
 module.exports = ProfileController;
