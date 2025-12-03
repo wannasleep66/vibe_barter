@@ -7,8 +7,14 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "lint": "eslint src/",
-    "docs": "jsdoc -c jsdoc.json"
+    "lint:fix": "eslint src/ --fix",
+    "docs": "jsdoc -c jsdoc.json",
+    "pretest": "npm run lint"
   },
   "keywords": [
     "barter",
