@@ -79,6 +79,7 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/categories', require('./routes/category'));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static('uploads'));
