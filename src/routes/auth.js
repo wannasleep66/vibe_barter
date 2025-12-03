@@ -11,7 +11,8 @@ const {
   logout,
   getMe,
   requestVerificationEmail,
-  verifyEmail
+  verifyEmail,
+  refreshToken
 } = require('../controllers/authController');
 const {
   validateRegister,
@@ -39,5 +40,8 @@ router.get('/me', protect, getMe);
 // Email verification routes
 router.post('/verify-email', validateEmailVerificationRequest, requestVerificationEmail);
 router.get('/verify-email/:token', validateEmailVerificationToken, verifyEmail);
+
+// Refresh token route
+router.post('/refresh-token', refreshToken);
 
 module.exports = router;

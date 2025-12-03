@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { logger } = require('../logger/logger');
 const AppError = require('../utils/AppError');
+const { blacklistToken } = require('../utils/jwt');
 
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -11,15 +12,18 @@ const signToken = (id) => {
   });
 };
 
-const createSendToken = (user, statusCode, res) => {
-  const token = signToken(user._id);
-  
+const { createTokens } = require('../utils/jwt');
+
+const createSendToken = async (user, statusCode, res) => {
+  const { accessToken, refreshToken } = createTokens(user);
+
   // Remove password from output
   user.password = undefined;
 
   res.status(statusCode).json({
     success: true,
-    token,
+    token: accessToken,
+    refreshToken, // Include refresh token in response
     data: {
       user
     }
@@ -325,9 +329,75 @@ exports.verifyEmail = async (req, res, next) => {
   }
 };
 
-exports.logout = (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Logged out successfully'
-  });
+// Refresh token functionality
+exports.refreshToken = async (req, res, next) => {
+  try {
+    const refreshToken = req.body.refreshToken || req.query.refreshToken;
+
+    if (!refreshToken) {
+      return next(new AppError('Refresh token is required', 400));
+    }
+
+    // In a real implementation, you would check if the refresh token is valid
+    // For now, we'll verify it's a valid JWT and the user still exists
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    } catch (error) {
+      return next(new AppError('Invalid refresh token', 403));
+    }
+
+    // Check if user still exists
+    const currentUser = await User.findById(decoded.id);
+    if (!currentUser) {
+      return next(new AppError('The user belonging to this token no longer exists.', 401));
+    }
+
+    // In a full implementation, you'd also check if the refresh token is blacklisted
+    // and maintain a refresh token database with user-specific tokens
+
+    // Generate new access token
+    const newAccessToken = jwt.sign({ id: currentUser._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '15m'
+    });
+
+    res.status(200).json({
+      success: true,
+      token: newAccessToken
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.logout = async (req, res, next) => {
+  try {
+    // Get the token from the request
+    let token = null;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (token) {
+      // Get user ID from token without verification (we're logging out anyway)
+      // Since we're logging out, we just want to blacklist the token
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded && decoded.id) {
+          await blacklistToken(token, decoded.id, 'access');
+        }
+      } catch (decodeError) {
+        // If we can't decode the token, just proceed with logout
+        logger.warn('Could not decode token during logout:', decodeError.message);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    logger.error('Logout error:', error);
+    next(error);
+  }
 };

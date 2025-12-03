@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { logger } = require('../logger/logger');
 const AppError = require('../utils/AppError');
+const { verifyTokenWithBlacklist, checkPasswordChangedAfterToken } = require('../utils/jwt');
 
 exports.protect = async (req, res, next) => {
   // 1) Getting token and check of it's there
@@ -18,8 +19,8 @@ exports.protect = async (req, res, next) => {
   }
 
   try {
-    // 2) Verification token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // 2) Verification token with blacklist check
+    const decoded = await verifyTokenWithBlacklist(token);
 
     // 3) Check if user still exists
     const currentUser = await User.findById(decoded.id);
@@ -30,7 +31,7 @@ exports.protect = async (req, res, next) => {
     }
 
     // 4) Check if user changed password after the token was issued
-    if (currentUser.changedPasswordAfter(decoded.iat)) {
+    if (checkPasswordChangedAfterToken(currentUser, decoded.iat)) {
       return next(
         new AppError('User recently changed password! Please log in again.', 401)
       );
@@ -40,6 +41,12 @@ exports.protect = async (req, res, next) => {
     req.user = currentUser;
     next();
   } catch (error) {
+    // If it's an AppError we threw, pass it along
+    if (error.isOperational) {
+      return next(error);
+    }
+
+    // For other errors (like JWT verification errors), return a generic message
     return next(new AppError('Invalid token. Please log in again.', 401));
   }
 };
