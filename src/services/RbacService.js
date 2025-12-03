@@ -28,6 +28,10 @@ class RbacService {
         { name: 'profile.read', resource: 'profile', action: 'read', description: 'View profiles' },
         { name: 'profile.update', resource: 'profile', action: 'update', description: 'Update profiles' },
         { name: 'profile.delete', resource: 'profile', action: 'delete', description: 'Delete profiles' },
+        // File permissions
+        { name: 'file.upload', resource: 'file', action: 'create', description: 'Upload files' },
+        { name: 'file.read', resource: 'file', action: 'read', description: 'Access files' },
+        { name: 'file.delete', resource: 'file', action: 'delete', description: 'Delete files' },
         
         // Review permissions
         { name: 'review.create', resource: 'review', action: 'create', description: 'Create reviews' },
@@ -95,7 +99,8 @@ class RbacService {
             'application.create', 'application.read',
             'ticket.create', 'ticket.read',
             'category.read',
-            'tag.read'
+            'tag.read',
+            'file.upload', 'file.read'
           ],
           systemRole: true
         },
@@ -111,7 +116,8 @@ class RbacService {
             'ticket.read', 'ticket.update',
             'category.create', 'category.read', 'category.update',
             'tag.create', 'tag.read', 'tag.update',
-            'session.manage', 'session.read'
+            'session.manage', 'session.read',
+            'file.upload', 'file.read', 'file.delete'
           ],
           systemRole: true
         },
