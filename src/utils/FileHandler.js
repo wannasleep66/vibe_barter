@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs').promises;
+const sharp = require('sharp');
 const { logger } = require('../logger/logger');
 
 class FileHandler {
@@ -209,6 +210,97 @@ class FileHandler {
       logger.error(`Error getting file info for ${filename}: ${error.message}`);
       return null;
     }
+  }
+
+  // Process profile photo (resize and optimize)
+  async processProfilePhoto(filePath, options = {}) {
+    const {
+      width = 300,
+      height = 300,
+      quality = 80,
+      fit = 'cover'
+    } = options;
+
+    try {
+      const resizedImageBuffer = await sharp(filePath)
+        .resize(width, height, {
+          fit: fit,
+          position: 'center'
+        })
+        .jpeg({ quality: quality })
+        .toBuffer();
+
+      // Write the processed image back to the file
+      await fs.writeFile(filePath, resizedImageBuffer);
+
+      // Return the dimensions of the processed image
+      const metadata = await sharp(resizedImageBuffer).metadata();
+      return {
+        width: metadata.width,
+        height: metadata.height,
+        size: resizedImageBuffer.length
+      };
+    } catch (error) {
+      logger.error(`Error processing profile photo: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Create multer middleware specifically for profile photos
+  createProfilePhotoUploadMiddleware(fieldname, options = {}) {
+    const {
+      maxSize = 2 * 1024 * 1024, // 2MB default for profile photos
+      allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+    } = options;
+
+    const storage = this.getStorageConfig();
+
+    const fileFilter = (req, file, cb) => {
+      // Only allow image types for profile photos
+      if (!allowedMimes.includes(file.mimetype)) {
+        cb(new Error(`Invalid file type: ${file.mimetype}. Allowed types: ${allowedMimes.join(', ')}`), false);
+        return;
+      }
+
+      // Additional security check: check file extension
+      const ext = path.extname(file.originalname).toLowerCase();
+      const allowedExtensions = allowedMimes.map(mime => {
+        switch (mime) {
+          case 'image/jpeg':
+          case 'image/jpg':
+            return ['.jpg', '.jpeg'];
+          case 'image/png':
+            return ['.png'];
+          case 'image/gif':
+            return ['.gif'];
+          default:
+            return [];
+        }
+      }).flat();
+
+      if (!allowedExtensions.includes(ext)) {
+        cb(new Error(`Invalid file extension: ${ext}`), false);
+        return;
+      }
+
+      // Check for potential malicious content
+      if (this.isPotentialMaliciousFile(file)) {
+        cb(new Error('File appears to be potentially malicious'), false);
+        return;
+      }
+
+      cb(null, true);
+    };
+
+    const upload = multer({
+      storage,
+      limits: {
+        fileSize: maxSize
+      },
+      fileFilter
+    });
+
+    return upload.single(fieldname);
   }
 }
 

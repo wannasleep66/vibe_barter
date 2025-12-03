@@ -83,5 +83,264 @@ module.exports = {
       });
     }
     next();
+  },
+
+  validateAddSkill: (req, res, next) => {
+    const { skill } = req.body;
+
+    if (!skill || typeof skill !== 'string' || skill.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Skill is required and must be a non-empty string'
+      });
+    }
+
+    if (skill.trim().length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'Skill name cannot exceed 50 characters'
+      });
+    }
+
+    next();
+  },
+
+  validateUpdateSkill: (req, res, next) => {
+    const { oldSkill, newSkill } = req.body;
+
+    if (!oldSkill || typeof oldSkill !== 'string' || oldSkill.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Old skill name is required and must be a non-empty string'
+      });
+    }
+
+    if (!newSkill || typeof newSkill !== 'string' || newSkill.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'New skill name is required and must be a non-empty string'
+      });
+    }
+
+    if (newSkill.trim().length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'New skill name cannot exceed 50 characters'
+      });
+    }
+
+    next();
+  },
+
+  validateAddLanguage: (req, res, next) => {
+    const { language, level } = req.body;
+
+    if (!language || typeof language !== 'string' || language.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Language is required and must be a non-empty string'
+      });
+    }
+
+    const validLevels = ['beginner', 'intermediate', 'advanced', 'fluent', 'native'];
+    if (level && (!validLevels.includes(level.toLowerCase()))) {
+      return res.status(400).json({
+        success: false,
+        message: `Level must be one of: ${validLevels.join(', ')}`
+      });
+    }
+
+    next();
+  },
+
+  validateUpdateLanguage: (req, res, next) => {
+    const { language, newLanguage, newLevel } = req.body;
+
+    if (!language || typeof language !== 'string' || language.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Language name is required and must be a non-empty string'
+      });
+    }
+
+    const validLevels = ['beginner', 'intermediate', 'advanced', 'fluent', 'native'];
+    if (newLanguage && (typeof newLanguage !== 'string' || newLanguage.trim().length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'New language must be a non-empty string if provided'
+      });
+    }
+
+    if (newLevel && !validLevels.includes(newLevel.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: `Level must be one of: ${validLevels.join(', ')}`
+      });
+    }
+
+    next();
+  },
+
+  validateAddContact: (req, res, next) => {
+    const { type, value } = req.body;
+
+    const validContactTypes = ['email', 'phone', 'website', 'social'];
+    if (!type || typeof type !== 'string' || !validContactTypes.includes(type.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: `Contact type is required and must be one of: ${validContactTypes.join(', ')}`
+      });
+    }
+
+    if (!value || typeof value !== 'string' || value.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Contact value is required and must be a non-empty string'
+      });
+    }
+
+    next();
+  },
+
+  validateUpdateContact: (req, res, next) => {
+    const { currentType, currentValue, newType, newValue } = req.body;
+
+    const validContactTypes = ['email', 'phone', 'website', 'social'];
+    if (!currentType || typeof currentType !== 'string' || !validContactTypes.includes(currentType.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: `Current contact type is required and must be one of: ${validContactTypes.join(', ')}`
+      });
+    }
+
+    if (!currentValue || typeof currentValue !== 'string' || currentValue.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current contact value is required and must be a non-empty string'
+      });
+    }
+
+    if (newType && (typeof newType !== 'string' || !validContactTypes.includes(newType.toLowerCase()))) {
+      return res.status(400).json({
+        success: false,
+        message: `New contact type must be one of: ${validContactTypes.join(', ')}`
+      });
+    }
+
+    if (newValue !== undefined && (typeof newValue !== 'string' || newValue.trim().length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'New contact value must be a non-empty string'
+      });
+    }
+
+    next();
+  },
+
+  validateAddPortfolioItem: (req, res, next) => {
+    const { title, description, url, media } = req.body;
+
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title is required and must be a non-empty string'
+      });
+    }
+
+    if (description !== undefined && typeof description !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Description must be a string if provided'
+      });
+    }
+
+    if (url && (typeof url !== 'string' || !isValidUrl(url))) {
+      return res.status(400).json({
+        success: false,
+        message: 'URL must be a valid URL string if provided'
+      });
+    }
+
+    if (media && !Array.isArray(media)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Media must be an array of URLs if provided'
+      });
+    }
+
+    if (media && Array.isArray(media)) {
+      for (const item of media) {
+        if (typeof item !== 'string' || !isValidUrl(item)) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid URL in media array: ${item}`
+          });
+        }
+      }
+    }
+
+    next();
+  },
+
+  validateUpdatePortfolioItem: (req, res, next) => {
+    const { currentTitle, newTitle, description, url, media } = req.body;
+
+    if (!currentTitle || typeof currentTitle !== 'string' || currentTitle.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current title is required and must be a non-empty string'
+      });
+    }
+
+    if (newTitle && (typeof newTitle !== 'string' || newTitle.trim().length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'New title must be a non-empty string if provided'
+      });
+    }
+
+    if (description !== undefined && typeof description !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Description must be a string if provided'
+      });
+    }
+
+    if (url !== undefined && url !== null && (typeof url !== 'string' || !isValidUrl(url))) {
+      return res.status(400).json({
+        success: false,
+        message: 'URL must be a valid URL string if provided'
+      });
+    }
+
+    if (media !== undefined && !Array.isArray(media)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Media must be an array of URLs if provided'
+      });
+    }
+
+    if (media && Array.isArray(media)) {
+      for (const item of media) {
+        if (typeof item !== 'string' || !isValidUrl(item)) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid URL in media array: ${item}`
+          });
+        }
+      }
+    }
+
+    next();
   }
 };
+
+// Helper function to validate URL
+function isValidUrl(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
