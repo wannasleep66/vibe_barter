@@ -493,6 +493,24 @@ exports.logout = async (req, res, next) => {
       }
     }
 
+    // Destroy Passport session if it exists
+    if (req.session) {
+      req.session.destroy((err) => {
+        if (err) {
+          logger.error('Error destroying session during logout:', err);
+        }
+      });
+    }
+
+    // Logout user from Passport
+    if (req.logout) {
+      req.logout((err) => {
+        if (err) {
+          logger.error('Error logging out from Passport:', err);
+        }
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: 'Logged out successfully'

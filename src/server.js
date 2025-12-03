@@ -79,6 +79,11 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/public/login.html'));
 });
 
+// Serve dashboard page
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/public/dashboard.html'));
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
