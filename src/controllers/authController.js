@@ -88,11 +88,30 @@ exports.login = async (req, res, next) => {
     const user = await User.findOne({ email }).select('+password');
 
     if (!user || !(await user.comparePassword(password))) {
+      // Log failed login attempt
+      logger.warn(`Failed login attempt for email: ${email} from IP: ${req.ip}`);
       return next(new AppError('Incorrect email or password', 401));
     }
 
-    // 3) If everything ok, send token to client
+    // 3) Check if account is active
+    if (!user.isActive) {
+      return next(new AppError('This account has been deactivated', 401));
+    }
+
+    // 4) Check if email is verified (optional: you can make this required or not)
+    if (!user.isEmailVerified) {
+      return next(new AppError('Please verify your email address before logging in', 401));
+    }
+
+    // 5) Update last login time
+    user.lastLoginAt = Date.now();
+    await user.save({ validateBeforeSave: false });
+
+    // 6) If everything ok, send token to client
     createSendToken(user, 200, res);
+
+    // Log successful login
+    logger.info(`Successful login for user: ${user._id} from IP: ${req.ip}`);
   } catch (error) {
     next(error);
   }

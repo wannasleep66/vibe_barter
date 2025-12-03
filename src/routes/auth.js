@@ -23,10 +23,13 @@ const {
   validateEmailVerificationToken
 } = require('../middleware/validation/authValidation');
 
+// Import middleware
+const authLimiter = require('../middleware/rateLimit');
+
 const router = express.Router();
 
-router.post('/register', validateRegister, register);
-router.post('/login', validateLogin, login);
+router.post('/register', authLimiter, validateRegister, register);
+router.post('/login', authLimiter, validateLogin, login);
 router.post('/logout', logout);
 router.post('/forgot-password', validateForgotPassword, forgotPassword);
 router.patch('/reset-password/:token', validateResetPassword, resetPassword);
