@@ -5,7 +5,8 @@ const profileSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
+    unique: true
   },
   bio: {
     type: String,
@@ -21,12 +22,14 @@ const profileSchema = new mongoose.Schema({
   },
   skills: [{
     type: String,
-    trim: true
+    trim: true,
+    maxlength: [50, 'Skill cannot exceed 50 characters']
   }],
   languages: [{
     language: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
     level: {
       type: String,
@@ -46,12 +49,44 @@ const profileSchema = new mongoose.Schema({
     }
   }],
   portfolio: [{
-    title: String,
+    title: {
+      type: String,
+      required: true,
+      trim: true
+    },
     description: String,
-    url: String
-  }]
+    url: String,
+    media: [String] // URLs to portfolio media
+  }],
+  rating: {
+    average: {
+      type: Number,
+      min: 0,
+      max: 5,
+      default: 0
+    },
+    count: {
+      type: Number,
+      default: 0
+    }
+  },
+  responseTimeHours: {
+    type: Number, // Average response time in hours
+    default: 24
+  },
+  availability: {
+    type: String,
+    enum: ['always', 'weekdays', 'weekends', 'rarely'],
+    default: 'always'
+  }
 }, {
   timestamps: true
 });
+
+// Index for location-based searches
+profileSchema.index({ location: 'text', skills: 'text' });
+
+// Index for availability filtering
+profileSchema.index({ availability: 1 });
 
 module.exports = mongoose.model('Profile', profileSchema);

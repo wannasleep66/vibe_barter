@@ -33,7 +33,10 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'moderator', 'admin'],
+    enum: {
+      values: ['user', 'moderator', 'admin'],
+      message: 'Role must be either user, moderator, or admin'
+    },
     default: 'user'
   },
   isEmailVerified: {
@@ -61,7 +64,7 @@ const userSchema = new mongoose.Schema({
 userSchema.pre('save', async function(next) {
   // Only hash password if it's modified
   if (!this.isModified('password')) return next();
-
+  
   this.password = await bcrypt.hash(this.password, 12);
   this.passwordChangedAt = Date.now() - 1000; // Subtract 1 sec to ensure token is created after password change
   next();
@@ -84,6 +87,16 @@ userSchema.methods.createPasswordResetToken = function() {
   this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
 
   return resetToken;
+};
+
+// Add to User model for password change check
+userSchema.methods.changedPasswordAfter = function(JWTTimestamp) {
+  if (this.passwordChangedAt) {
+    const changedTimestamp = parseInt(this.passwordChangedAt.getTime() / 1000, 10);
+    return JWTTimestamp < changedTimestamp;
+  }
+
+  return false;
 };
 
 module.exports = mongoose.model('User', userSchema);
