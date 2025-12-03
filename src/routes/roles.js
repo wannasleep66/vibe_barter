@@ -3,6 +3,15 @@ const express = require('express');
 const roleController = require('../controllers/roleController');
 const { protect, restrictTo } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/rbac');
+const {
+  validateCreateRole,
+  validateUpdateRole,
+  validateRoleId,
+  validateRoleName,
+  validateGetRoles,
+  validateAssignRoleToUser,
+  validateAddPermissionToRole
+} = require('../middleware/validation/roleValidation');
 
 const router = express.Router();
 
@@ -11,16 +20,16 @@ router.use(protect);
 router.use(isAdmin); // Only admins can manage roles
 
 // Role management routes
-router.get('/', roleController.getAllRoles);
+router.get('/', validateGetRoles, roleController.getAllRoles);
 router.get('/all-permissions', roleController.getAllPermissions);
-router.get('/role-permissions/:roleName', roleController.getRolePermissions);
-router.get('/:id', roleController.getRoleById);
+router.get('/role-permissions/:roleName', validateRoleName, roleController.getRolePermissions);
+router.get('/:id', validateRoleId, roleController.getRoleById);
 
-router.post('/', roleController.createRole);
-router.patch('/assign-role', roleController.assignRoleToUser);
-router.patch('/add-permission', roleController.addPermissionToRole);
-router.patch('/:id', roleController.updateRole);
+router.post('/', validateCreateRole, roleController.createRole);
+router.patch('/assign-role', validateAssignRoleToUser, roleController.assignRoleToUser);
+router.patch('/add-permission', validateAddPermissionToRole, roleController.addPermissionToRole);
+router.patch('/:id', validateRoleId, validateUpdateRole, roleController.updateRole);
 
-router.delete('/:id', roleController.deleteRole);
+router.delete('/:id', validateRoleId, roleController.deleteRole);
 
 module.exports = router;
