@@ -43,6 +43,21 @@ exports.register = async (req, res, next) => {
       lastName
     });
 
+    // Generate email verification token
+    const verificationToken = user.createEmailVerificationToken();
+    await user.save({ validateBeforeSave: false });
+
+    // Send verification email
+    // In a production environment, you might want to send this in a background job
+    try {
+      const emailService = require('../services/EmailService');
+      await emailService.sendEmailVerification(user, verificationToken);
+    } catch (emailError) {
+      // Log the error but don't prevent registration due to email failure
+      logger.error('Failed to send verification email:', emailError);
+      // The user will still need to verify their email but will have to request it again
+    }
+
     createSendToken(user, 201, res);
   } catch (error) {
     // Handle duplicate key error (email uniqueness)
@@ -209,6 +224,86 @@ exports.updatePassword = async (req, res, next) => {
 exports.getMe = (req, res, next) => {
   req.params.id = req.user.id;
   next();
+};
+
+// Request new email verification
+exports.requestVerificationEmail = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return next(new AppError('No user found with this email address', 404));
+    }
+
+    if (user.isEmailVerified) {
+      return next(new AppError('Email is already verified', 400));
+    }
+
+    // Generate new email verification token
+    const verificationToken = user.createEmailVerificationToken();
+    await user.save({ validateBeforeSave: false });
+
+    // Send verification email
+    try {
+      const emailService = require('../services/EmailService');
+      await emailService.sendEmailVerification(user, verificationToken);
+
+      res.status(200).json({
+        success: true,
+        message: 'Verification email sent successfully'
+      });
+    } catch (emailError) {
+      logger.error('Failed to send verification email:', emailError);
+      return next(new AppError('Failed to send verification email. Please try again later.', 500));
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Verify email with token
+exports.verifyEmail = async (req, res, next) => {
+  try {
+    // Hash the token from the URL params
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(req.params.token)
+      .digest('hex');
+
+    // Find user with matching verification token and not expired
+    const user = await User.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return next(new AppError('Token is invalid or has expired', 400));
+    }
+
+    // Update user to mark email as verified
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+
+    await user.save({ validateBeforeSave: false });
+
+    // Send welcome email
+    try {
+      const emailService = require('../services/EmailService');
+      await emailService.sendWelcomeEmail(user);
+    } catch (emailError) {
+      logger.error('Failed to send welcome email:', emailError);
+      // Don't prevent verification due to welcome email failure
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 exports.logout = (req, res) => {

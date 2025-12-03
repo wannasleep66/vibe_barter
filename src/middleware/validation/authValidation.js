@@ -204,3 +204,48 @@ exports.validateUpdatePassword = async (req, res, next) => {
     return next(error);
   }
 };
+
+// Email verification request schema
+const emailVerificationSchema = Joi.object({
+  email: Joi.string()
+    .email()
+    .required()
+    .messages({
+      'string.email': 'Please provide a valid email address',
+      'any.required': 'Email is required'
+    })
+});
+
+// Validate email verification request
+exports.validateEmailVerificationRequest = async (req, res, next) => {
+  try {
+    await emailVerificationSchema.validateAsync(req.body, { abortEarly: false });
+    next();
+  } catch (error) {
+    if (error.isJoi || error.name === 'ValidationError') {
+      const errors = error.details.map(detail => detail.message);
+      return next(new AppError(`Validation error: ${errors.join(', ')}`, 400));
+    }
+    return next(error);
+  }
+};
+
+// Validate email verification token
+exports.validateEmailVerificationToken = async (req, res, next) => {
+  try {
+    // Check if the token is provided in URL parameters
+    if (!req.params.token) {
+      return next(new AppError('Verification token is required', 400));
+    }
+
+    // Basic validation for token format (hex string of expected length)
+    const tokenRegex = /^[a-f0-9]{64}$/; // 32 bytes hex string
+    if (!tokenRegex.test(req.params.token)) {
+      return next(new AppError('Invalid verification token format', 400));
+    }
+
+    next();
+  } catch (error) {
+    return next(error);
+  }
+};
