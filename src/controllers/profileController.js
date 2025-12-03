@@ -1,6 +1,9 @@
 const Profile = require('../models/Profile');
 const User = require('../models/User');
+const FileHandler = require('../utils/FileHandler');
 const { logger } = require('../logger/logger');
+
+const fileHandler = new FileHandler('./uploads');
 
 class ProfileController {
   // Create profile
@@ -254,6 +257,123 @@ class ProfileController {
       res.status(500).json({
         success: false,
         message: 'Error searching profiles',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Upload profile photo
+  static async uploadProfilePhoto(req, res) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No file provided'
+        });
+      }
+
+      // Validate file content to ensure it's a legitimate image
+      const isValid = await fileHandler.validateFileContent(req.file.path, req.file.mimetype);
+      if (!isValid) {
+        // Remove the potentially malicious file
+        await fileHandler.removeFile(req.file.filename);
+        return res.status(400).json({
+          success: false,
+          message: 'File validation failed. Possible malicious content detected.'
+        });
+      }
+
+      // Process the image (resize and optimize)
+      try {
+        await fileHandler.processProfilePhoto(req.file.path, {
+          width: 300,
+          height: 300,
+          quality: 80
+        });
+      } catch (processError) {
+        logger.error(`Error processing profile photo: ${processError.message}`);
+        // Remove the file if processing fails
+        await fileHandler.removeFile(req.file.filename);
+        return res.status(500).json({
+          success: false,
+          message: 'Error processing image file'
+        });
+      }
+
+      // Find or create profile for the user
+      let profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        // Create a basic profile if it doesn't exist
+        profile = await Profile.create({
+          user: req.user._id,
+          avatar: fileHandler.getFileUrl(req.file.filename)
+        });
+      } else {
+        // Update existing profile with new avatar
+        // If there was an old avatar, we might want to delete it (optional cleanup)
+        const oldAvatar = profile.avatar;
+        profile.avatar = fileHandler.getFileUrl(req.file.filename);
+        await profile.save();
+
+        // Delete old avatar file if it exists (optional)
+        if (oldAvatar && oldAvatar.startsWith('/uploads/')) {
+          const oldFilename = oldAvatar.replace('/uploads/', '');
+          if (oldFilename !== req.file.filename) { // Don't delete the new file
+            await fileHandler.removeFile(oldFilename);
+          }
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Profile photo uploaded successfully',
+        data: {
+          avatar: profile.avatar
+        }
+      });
+    } catch (error) {
+      logger.error(`Error uploading profile photo: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error uploading profile photo',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Remove profile photo
+  static async removeProfilePhoto(req, res) {
+    try {
+      const profile = await Profile.findOne({ user: req.user._id });
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // If there's an existing avatar, remove the file
+      if (profile.avatar && profile.avatar.startsWith('/uploads/')) {
+        const filename = profile.avatar.replace('/uploads/', '');
+        await fileHandler.removeFile(filename);
+      }
+
+      // Remove avatar from profile
+      profile.avatar = null;
+      await profile.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Profile photo removed successfully',
+        data: {
+          avatar: profile.avatar
+        }
+      });
+    } catch (error) {
+      logger.error(`Error removing profile photo: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error removing profile photo',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

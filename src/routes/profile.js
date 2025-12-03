@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const ProfileController = require('../controllers/profileController');
+const FileHandler = require('../utils/FileHandler');
 const { protect } = require('../middleware/auth');
 const { requirePermissions } = require('../middleware/rbac');
 const { validateCreateProfile, validateUpdateProfile } = require('../middleware/profileValidation');
+
+const fileHandler = new FileHandler('./uploads');
 
 // All routes are protected
 router.use(protect);
@@ -28,5 +31,11 @@ router.get('/', ProfileController.getAllProfiles);
 
 // Search profiles
 router.get('/search', ProfileController.searchProfiles);
+
+// Upload profile photo
+router.post('/photo', fileHandler.createProfilePhotoUploadMiddleware('photo'), ProfileController.uploadProfilePhoto);
+
+// Remove profile photo
+router.delete('/photo', ProfileController.removeProfilePhoto);
 
 module.exports = router;
