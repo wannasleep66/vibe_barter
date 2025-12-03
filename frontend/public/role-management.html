@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barter Vibe - Role Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 25px;
+        }
+        .role-item {
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: white;
+        }
+        .permission-tag {
+            background-color: #e9ecef;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-right: 5px;
+            margin-bottom: 5px;
+            display: inline-block;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: white;
+            border-bottom: 1px solid white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-xl-12 col-lg-12">
+                <div class="card">
+                    <div class="card-header text-center">
+                        <h3 class="mb-0">
+                            <i class="fas fa-users-cog me-2"></i>
+                            Role Management
+                        </h3>
+                        <p class="mb-0">Manage user roles and permissions</p>
+                    </div>
+                    <div class="card-body p-4">
+                        <!-- Navigation Tabs -->
+                        <ul class="nav nav-tabs mb-4" id="roleTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="roles-tab" data-bs-toggle="tab" data-bs-target="#roles" type="button" role="tab">
+                                    <i class="fas fa-user-tag me-2"></i>Roles
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="permissions-tab" data-bs-toggle="tab" data-bs-target="#permissions" type="button" role="tab">
+                                    <i class="fas fa-key me-2"></i>Permissions
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="assign-tab" data-bs-toggle="tab" data-bs-target="#assign" type="button" role="tab">
+                                    <i class="fas fa-user-plus me-2"></i>Assign Roles
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content" id="roleTabContent">
+                            <!-- Roles Tab -->
+                            <div class="tab-pane fade show active" id="roles" role="tabpanel">
+                                <div class="d-flex justify-content-between align-items-center mb-4">
+                                    <h5>System Roles</h5>
+                                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRoleModal">
+                                        <i class="fas fa-plus me-2"></i>New Role
+                                    </button>
+                                </div>
+                                
+                                <div id="rolesList">
+                                    <div class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Loading roles...</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Permissions Tab -->
+                            <div class="tab-pane fade" id="permissions" role="tabpanel">
+                                <h5 class="mb-4">System Permissions</h5>
+                                <div id="permissionsList">
+                                    <div class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Loading permissions...</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Assign Roles Tab -->
+                            <div class="tab-pane fade" id="assign" role="tabpanel">
+                                <h5 class="mb-4">Assign Roles to Users</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="userSelect" class="form-label">Select User</label>
+                                            <select class="form-select" id="userSelect">
+                                                <option selected disabled>Loading users...</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="roleSelect" class="form-label">Select Role</label>
+                                            <select class="form-select" id="roleSelect">
+                                                <option selected disabled>Loading roles...</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <button id="assignRoleBtn" class="btn btn-success">
+                                        <i class="fas fa-user-check me-2"></i>Assign Role
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Role Modal -->
+    <div class="modal fade" id="createRoleModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Role</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createRoleForm">
+                        <div class="mb-3">
+                            <label for="roleName" class="form-label">Role Name</label>
+                            <input type="text" class="form-control" id="roleName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="roleDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="roleDescription" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Permissions</label>
+                            <div id="permissionsListCheckbox" class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                                <div class="text-center py-3">
+                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveRoleBtn">Create Role</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View/Edit Role Modal -->
+    <div class="modal fade" id="viewRoleModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Role Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="roleDetails">
+                        <div class="text-center py-3">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let currentToken = localStorage.getItem('token');
+        let allRoles = [];
+        let allPermissions = [];
+        let allUsers = [];
+
+        // DOM Elements
+        const rolesList = document.getElementById('rolesList');
+        const permissionsList = document.getElementById('permissionsList');
+        const userSelect = document.getElementById('userSelect');
+        const roleSelect = document.getElementById('roleSelect');
+        const assignRoleBtn = document.getElementById('assignRoleBtn');
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRoles();
+            loadPermissions();
+            loadUsers();
+        });
+
+        // Load roles
+        async function loadRoles() {
+            try {
+                const response = await fetch('/api/roles/', {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    allRoles = data.data;
+                    displayRoles(data.data);
+                } else {
+                    rolesList.innerHTML = `<div class="alert alert-danger">Failed to load roles</div>`;
+                }
+            } catch (error) {
+                console.error('Error loading roles:', error);
+                rolesList.innerHTML = `<div class="alert alert-danger">Network error while loading roles</div>`;
+            }
+        }
+
+        // Display roles
+        function displayRoles(roles) {
+            if (roles.length === 0) {
+                rolesList.innerHTML = `<div class="alert alert-info">No roles found</div>`;
+                return;
+            }
+
+            let html = '';
+            roles.forEach(role => {
+                html += `
+                    <div class="role-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">
+                                    <span class="badge bg-primary me-2">${role.name}</span>
+                                </h6>
+                                <p class="text-muted small mb-2">${role.description || 'No description'}</p>
+                                <div class="mb-2">
+                                    <small class="text-muted">Permissions (${role.permissions.length}):</small><br>
+                `;
+                
+                if (role.permissions.length === 0) {
+                    html += `<span class="badge bg-warning">No permissions assigned</span>`;
+                } else {
+                    role.permissions.forEach(permission => {
+                        html += `<span class="permission-tag">${permission.name}</span>`;
+                    });
+                }
+                
+                html += `
+                                </div>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline-primary btn-sm me-1" onclick="viewRole('${role._id}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="deleteRole('${role._id}', '${role.name}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            rolesList.innerHTML = html;
+        }
+
+        // Load permissions
+        async function loadPermissions() {
+            try {
+                const response = await fetch('/api/roles/all-permissions', {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    allPermissions = data.data;
+                    
+                    // Update permissions tab
+                    displayPermissions(data.data);
+                    
+                    // Update create role modal permissions list
+                    updatePermissionsCheckbox(data.data);
+                } else {
+                    permissionsList.innerHTML = `<div class="alert alert-danger">Failed to load permissions</div>`;
+                }
+            } catch (error) {
+                console.error('Error loading permissions:', error);
+                permissionsList.innerHTML = `<div class="alert alert-danger">Network error while loading permissions</div>`;
+            }
+        }
+
+        // Display permissions
+        function displayPermissions(permissions) {
+            if (permissions.length === 0) {
+                permissionsList.innerHTML = `<div class="alert alert-info">No permissions found</div>`;
+                return;
+            }
+
+            let html = '<div class="row">';
+            permissions.forEach(perm => {
+                html += `
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">${perm.name}</h6>
+                                <p class="card-text text-muted">${perm.description || 'No description'}</p>
+                                <small class="text-muted">Resource: ${perm.resource} | Action: ${perm.action}</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            permissionsList.innerHTML = html;
+        }
+
+        // Update permissions checkbox in create role modal
+        function updatePermissionsCheckbox(permissions) {
+            const container = document.getElementById('permissionsListCheckbox');
+            if (!container) return;
+            
+            let html = '';
+            permissions.forEach(perm => {
+                html += `
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" value="${perm._id}" id="perm_${perm._id}" name="permissions">
+                        <label class="form-check-label" for="perm_${perm._id}">
+                            ${perm.name} <small class="text-muted">(${perm.resource}:${perm.action})</small>
+                        </label>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Load users for role assignment
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users?page=1&limit=100', {  // Assuming we have a get users endpoint
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    allUsers = data.data;
+                    
+                    // Update user selection dropdown
+                    let options = '<option selected disabled>Select a user</option>';
+                    allUsers.forEach(user => {
+                        options += `<option value="${user._id}">${user.firstName} ${user.lastName} (${user.email}) [${user.role}]</option>`;
+                    });
+                    userSelect.innerHTML = options;
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+                userSelect.innerHTML = '<option selected disabled>Error loading users</option>';
+            }
+        }
+
+        // Update role selection dropdown
+        function updateRoleSelect() {
+            let options = '<option selected disabled>Select a role</option>';
+            allRoles.forEach(role => {
+                options += `<option value="${role.name}">${role.name} - ${role.description || 'No description'}</option>`;
+            });
+            roleSelect.innerHTML = options;
+        }
+
+        // View role details
+        async function viewRole(roleId) {
+            const role = allRoles.find(r => r._id === roleId);
+            if (!role) return;
+
+            const modalBody = document.querySelector('#viewRoleModal .modal-body #roleDetails');
+            if (!modalBody) return;
+
+            // Show loading state
+            modalBody.innerHTML = `
+                <div class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                </div>
+            `;
+
+            // Fetch detailed role information
+            try {
+                const response = await fetch(`/api/roles/${roleId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const role = data.data;
+                    
+                    let html = `
+                        <div class="mb-3">
+                            <h5>${role.name}</h5>
+                            <p><strong>Description:</strong> ${role.description || 'No description'}</p>
+                            <p><strong>Status:</strong> ${role.isActive ? 'Active' : 'Inactive'}</p>
+                        </div>
+                        <hr>
+                        <div>
+                            <h6>Assigned Permissions (${role.permissions.length}):</h6>
+                    `;
+                    
+                    if (role.permissions.length === 0) {
+                        html += `<p class="text-muted">No permissions assigned</p>`;
+                    } else {
+                        html += '<div class="row">';
+                        role.permissions.forEach(perm => {
+                            html += `
+                                <div class="col-md-6 mb-2">
+                                    <div class="d-flex justify-content-between align-items-center border p-2 rounded">
+                                        <div>
+                                            <strong>${perm.name}</strong><br>
+                                            <small class="text-muted">${perm.description || 'No description'}</small>
+                                        </div>
+                                        <span class="badge bg-info">${perm.resource}:${perm.action}</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                    }
+                    
+                    html += '</div>';
+                    modalBody.innerHTML = html;
+                    
+                    // Show the modal
+                    const modal = new bootstrap.Modal(document.getElementById('viewRoleModal'));
+                    modal.show();
+                }
+            } catch (error) {
+                modalBody.innerHTML = `<div class="alert alert-danger">Error loading role details</div>`;
+            }
+        }
+
+        // Delete role
+        async function deleteRole(roleId, roleName) {
+            if (!confirm(`Are you sure you want to delete the role "${roleName}"? This action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/roles/${roleId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(`Role "${roleName}" deleted successfully.`);
+                    loadRoles(); // Refresh roles list
+                } else {
+                    alert(`Error: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error deleting role:', error);
+                alert('Network error. Please try again.');
+            }
+        }
+
+        // Assign role to user
+        assignRoleBtn.addEventListener('click', async function() {
+            const userId = userSelect.value;
+            const roleName = roleSelect.value;
+
+            if (!userId || !roleName) {
+                alert('Please select both user and role');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/roles/assign-role', {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        roleName
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(`Role "${roleName}" assigned to user successfully!`);
+                    loadUsers(); // Refresh user list
+                } else {
+                    alert(`Error: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error assigning role:', error);
+                alert('Network error. Please try again.');
+            }
+        });
+
+        // Create role form submission
+        document.getElementById('saveRoleBtn').addEventListener('click', async function() {
+            const roleName = document.getElementById('roleName').value.trim();
+            const roleDescription = document.getElementById('roleDescription').value.trim();
+            
+            // Get selected permissions
+            const selectedPermissions = Array.from(document.querySelectorAll('input[name="permissions"]:checked'))
+                .map(cb => cb.value);
+
+            if (!roleName) {
+                alert('Role name is required');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/roles/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: roleName,
+                        description: roleDescription,
+                        permissions: selectedPermissions
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(`Role "${roleName}" created successfully!`);
+                    
+                    // Clear form
+                    document.getElementById('createRoleForm').reset();
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createRoleModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    
+                    // Refresh roles list
+                    loadRoles();
+                    loadPermissions(); // In case we added new permissions
+                } else {
+                    alert(`Error: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error creating role:', error);
+                alert('Network error. Please try again.');
+            }
+        });
+
+        // Update role selection when roles are loaded
+        const originalDisplayRoles = displayRoles;
+        displayRoles = function(roles) {
+            originalDisplayRoles(roles);
+            updateRoleSelect();
+        };
+    </script>
+</body>
+</html>
