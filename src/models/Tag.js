@@ -5,14 +5,14 @@ const tagSchema = new mongoose.Schema({
   name: {
     type: String,
     required: [true, 'Tag name is required'],
-    unique: true,
     trim: true,
     lowercase: true,
-    maxlength: [30, 'Tag name cannot exceed 30 characters']
+    maxlength: [50, 'Tag name cannot exceed 50 characters'],
+    unique: true
   },
   description: {
     type: String,
-    maxlength: [200, 'Description cannot exceed 200 characters']
+    maxlength: [200, 'Tag description cannot exceed 200 characters']
   },
   isActive: {
     type: Boolean,
@@ -22,21 +22,33 @@ const tagSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  isSystemTag: {
-    type: Boolean,
-    default: false // Indicates if this is a predefined system tag
+  color: {
+    type: String, // Color code for the tag
+    maxlength: [7, 'Color code cannot exceed 7 characters (e.g., #FF0000)']
+  },
+  icon: {
+    type: String, // Icon class or URL for the tag
+    maxlength: [50, 'Icon reference cannot exceed 50 characters']
   }
 }, {
   timestamps: true
 });
 
-// Index for name for faster lookups and case-insensitive searches
+// Indexes for efficient querying
 tagSchema.index({ name: 1 });
-
-// Index for active tags
 tagSchema.index({ isActive: 1 });
+tagSchema.index({ usageCount: -1 }); // Sort by usage count descending
 
-// Index for system tags
-tagSchema.index({ isSystemTag: 1 });
+// Method to increment usage count
+tagSchema.methods.incrementUsage = async function() {
+  this.usageCount += 1;
+  await this.save();
+};
+
+// Method to decrement usage count
+tagSchema.methods.decrementUsage = async function() {
+  this.usageCount = Math.max(0, this.usageCount - 1);
+  await this.save();
+};
 
 module.exports = mongoose.model('Tag', tagSchema);
