@@ -25,19 +25,26 @@ exports.requirePermissions = (...requiredPermissions) => {
         return next(new AppError('User role not found.', 401));
       }
 
-      // Check if user has required permissions
-      const userPermissions = userRole.permissions.map(permission => permission.name);
-      const hasAllRequiredPermissions = requiredPermissions.every(permission => 
-        userPermissions.includes(permission)
+      // Get user's permissions
+      const userPermissionNames = userRole.permissions.map(permission => permission.name);
+
+      // Check if user has wildcard permission (admin access to everything)
+      if (userPermissionNames.includes('*')) {
+        return next();
+      }
+
+      // Check if user has all required permissions
+      const hasAllPermissions = requiredPermissions.every(permission =>
+        userPermissionNames.includes(permission)
       );
 
-      if (!hasAllRequiredPermissions) {
+      if (!hasAllPermissions) {
         logger.warn(`User ${req.user.id} attempted to access resource without required permission(s)`);
         return next(new AppError('Insufficient permissions to perform this action', 403));
       }
 
       // Add permissions to request for use in controllers if needed
-      req.userPermissions = userPermissions;
+      req.userPermissions = userPermissionNames;
       next();
     } catch (error) {
       logger.error('RBAC middleware error:', error);
@@ -47,18 +54,17 @@ exports.requirePermissions = (...requiredPermissions) => {
 };
 
 /**
- * Resource-based permission check
- * @param {string} resource - The resource to check permissions for (e.g., 'user', 'advertisement')
- * @param {string} action - The action to check permissions for (e.g., 'read', 'create', 'update', 'delete')
+ * Check if user has a specific permission
+ * @param {string} requiredPermission - The permission required
  */
-exports.checkResourcePermission = (resource, action) => {
+exports.hasPermission = (requiredPermission) => {
   return async (req, res, next) => {
     try {
       if (!req.user) {
         return next(new AppError('You are not logged in! Please log in to get access.', 401));
       }
 
-      // Get user's role and permissions
+      // Get user's role and its permissions
       const userRole = await Role.findOne({ name: req.user.role })
         .populate('permissions')
         .exec();
@@ -67,78 +73,25 @@ exports.checkResourcePermission = (resource, action) => {
         return next(new AppError('User role not found.', 401));
       }
 
-      // Check if user has permission for this specific resource-action
-      const requiredPermissionName = `${resource}.${action}`;
-      const hasPermission = userRole.permissions.some(permission => 
-        permission.name === requiredPermissionName || permission.name === '*'
-      );
+      // Get user's permission names
+      const userPermissionNames = userRole.permissions.map(permission => permission.name);
 
-      if (!hasPermission) {
-        logger.warn(`User ${req.user.id} attempted to ${action} ${resource} without permission`);
-        return next(new AppError(`You do not have permission to ${action} ${resource}(s)`, 403));
+      // Check if user has wildcard permission or specific permission
+      if (userPermissionNames.includes('*') || userPermissionNames.includes(requiredPermission)) {
+        next();
+      } else {
+        logger.warn(`User ${req.user.id} attempted to access resource without required permission: ${requiredPermission}`);
+        return next(new AppError(`You do not have permission to perform this action`, 403));
       }
-
-      // Check ownership for update/delete operations if needed
-      if ((action === 'update' || action === 'delete') && req.params.id) {
-        const resourceId = req.params.id;
-        
-        // Determine if the user owns the resource or has global permissions
-        const isOwner = await checkResourceOwnership(req.user.id, resource, resourceId);
-        
-        // Admins and moderators may have broader permissions
-        const isSuperUser = req.user.role === 'admin' || req.user.role === 'moderator';
-        
-        if (!isOwner && !isSuperUser) {
-          return next(new AppError(`You can only ${action} your own ${resource}`, 403));
-        }
-      }
-
-      next();
     } catch (error) {
-      logger.error('Resource permission middleware error:', error);
+      logger.error('Permission check middleware error:', error);
       return next(new AppError('Access control error. Please try again later.', 500));
     }
   };
 };
 
 /**
- * Check if user owns a specific resource
- * @param {string} userId - The ID of the user
- * @param {string} resource - The resource type
- * @param {string} resourceId - The ID of the specific resource
- */
-async function checkResourceOwnership(userId, resource, resourceId) {
-  try {
-    // This is a simplified implementation - in a full system, you'd have specific logic for each resource type
-    switch (resource) {
-      case 'user':
-        return userId === resourceId;
-      case 'profile':
-        // Check if profile belongs to user
-        const Profile = require('../models/Profile');
-        const profile = await Profile.findById(resourceId);
-        return profile && profile.user.toString() === userId;
-      case 'advertisement':
-        // Check if advertisement belongs to user
-        const Advertisement = require('../models/Advertisement');
-        const ad = await Advertisement.findById(resourceId);
-        return ad && ad.ownerId.toString() === userId;
-      case 'application':
-        // Check if application belongs to user
-        const Application = require('../models/Application');
-        const app = await Application.findById(resourceId);
-        return app && app.applicantId.toString() === userId;
-      default:
-        return false;
-    }
-  } catch (error) {
-    logger.error('Error checking resource ownership:', error);
-    return false;
-  }
-}
-
-/**
- * Middleware to check if current user is an admin
+ * Middleware to check if user is an admin
  */
 exports.isAdmin = async (req, res, next) => {
   try {
@@ -158,9 +111,9 @@ exports.isAdmin = async (req, res, next) => {
 };
 
 /**
- * Middleware to check if current user is a moderator or admin
+ * Middleware to check if user is admin or moderator
  */
-exports.isModeratorOrAdmin = async (req, res, next) => {
+exports.isAdminOrModerator = async (req, res, next) => {
   try {
     if (!req.user) {
       return next(new AppError('You are not logged in! Please log in to get access.', 401));
@@ -172,14 +125,107 @@ exports.isModeratorOrAdmin = async (req, res, next) => {
 
     next();
   } catch (error) {
-    logger.error('Moderator/admin check middleware error:', error);
+    logger.error('Admin/Moderator check middleware error:', error);
     return next(new AppError('Access control error. Please try again later.', 500));
   }
 };
 
-module.exports = {
-  requirePermissions: exports.requirePermissions,
-  checkResourcePermission: exports.checkResourcePermission,
-  isAdmin: exports.isAdmin,
-  isModeratorOrAdmin: exports.isModeratorOrAdmin
+/**
+ * Middleware to check if user is accessing their own resource or has admin privileges
+ */
+exports.isOwnResourceOrAdmin = (resourceIdField = 'id') => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return next(new AppError('You are not logged in! Please log in to get access.', 401));
+      }
+
+      const resourceId = req.params[resourceIdField] || req.body[resourceIdField];
+
+      // Allow admin users to access any resource
+      if (req.user.role === 'admin') {
+        return next();
+      }
+
+      // Check if user is accessing their own resource
+      if (req.user.id === resourceId || req.user._id.toString() === resourceId) {
+        return next();
+      }
+
+      return next(new AppError('Access denied. You can only access your own resources.', 403));
+    } catch (error) {
+      logger.error('Own resource check middleware error:', error);
+      return next(new AppError('Access control error. Please try again later.', 500));
+    }
+  };
+};
+
+/**
+ * Middleware to check if user is an admin
+ */
+exports.isAdmin = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return next(new AppError('You are not logged in! Please log in to get access.', 401));
+    }
+
+    if (req.user.role !== 'admin') {
+      return next(new AppError('Administrative access required', 403));
+    }
+
+    next();
+  } catch (error) {
+    logger.error('Admin check middleware error:', error);
+    return next(new AppError('Access control error. Please try again later.', 500));
+  }
+};
+
+/**
+ * Middleware to check if user is admin or moderator
+ */
+exports.isAdminOrModerator = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return next(new AppError('You are not logged in! Please log in to get access.', 401));
+    }
+
+    if (!['admin', 'moderator'].includes(req.user.role)) {
+      return next(new AppError('Moderation access required', 403));
+    }
+
+    next();
+  } catch (error) {
+    logger.error('Admin/Moderator check middleware error:', error);
+    return next(new AppError('Access control error. Please try again later.', 500));
+  }
+};
+
+/**
+ * Middleware to check if user is accessing their own resource or has admin privileges
+ */
+exports.isOwnResourceOrAdmin = (resourceIdField = 'id') => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return next(new AppError('You are not logged in! Please log in to get access.', 401));
+      }
+
+      const resourceId = req.params[resourceIdField] || req.body[resourceIdField];
+      
+      // Allow admin users to access any resource
+      if (req.user.role === 'admin') {
+        return next();
+      }
+
+      // Check if user is accessing their own resource
+      if (req.user.id === resourceId || req.user._id.toString() === resourceId) {
+        return next();
+      }
+
+      return next(new AppError('Access denied. You can only access your own resources.', 403));
+    } catch (error) {
+      logger.error('Own resource check middleware error:', error);
+      return next(new AppError('Access control error. Please try again later.', 500));
+    }
+  };
 };
