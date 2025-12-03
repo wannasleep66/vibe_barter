@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barter Vibe - Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 20px;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 25px;
+        }
+        .form-control {
+            border-radius: 10px;
+            padding: 12px 15px;
+        }
+        .btn-primary {
+            border-radius: 10px;
+            padding: 12px 20px;
+            font-weight: 600;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-4">
+                <div class="card">
+                    <div class="card-header text-center">
+                        <h3 class="mb-0">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            Barter Vibe
+                        </h3>
+                        <p class="mb-0">Sign in to your account</p>
+                    </div>
+                    <div class="card-body p-4">
+                        <form id="loginForm">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" name="email" required>
+                                <div class="invalid-feedback">Please enter a valid email address</div>
+                            </div>
+                            
+                            <div class="mb-3 position-relative">
+                                <label for="password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                                <i class="fas fa-eye password-toggle" id="togglePassword"></i>
+                                <div class="invalid-feedback">Please enter your password</div>
+                            </div>
+                            
+                            <div class="d-grid mb-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-sign-in-alt me-2"></i>
+                                    Sign In
+                                </button>
+                            </div>
+                            
+                            <div class="text-center">
+                                <p class="mb-0">
+                                    Don't have an account? 
+                                    <a href="/register" class="text-decoration-none">Sign up</a>
+                                </p>
+                                <p class="mb-0 mt-2">
+                                    <a href="/forgot-password" class="text-decoration-none">Forgot password?</a>
+                                </p>
+                            </div>
+                        </form>
+                        
+                        <div id="loadingSpinner" class="d-none text-center my-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 mb-0">Signing in...</p>
+                        </div>
+                        
+                        <div id="errorAlert" class="alert alert-danger d-none mt-3" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <span id="errorMessage"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Password visibility toggle
+        document.getElementById('togglePassword').addEventListener('click', function() {
+            const passwordInput = document.getElementById('password');
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+
+        // Form validation
+        const form = document.getElementById('loginForm');
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Reset error messages
+            document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            document.getElementById('errorAlert').classList.add('d-none');
+            
+            // Get form data
+            const formData = new FormData(form);
+            const userData = Object.fromEntries(formData);
+            
+            // Basic client-side validation
+            let isValid = true;
+            
+            // Validate email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!userData.email || !emailRegex.test(userData.email)) {
+                document.getElementById('email').classList.add('is-invalid');
+                isValid = false;
+            }
+            
+            // Validate password
+            if (!userData.password || userData.password.trim().length === 0) {
+                document.getElementById('password').classList.add('is-invalid');
+                isValid = false;
+            }
+            
+            if (!isValid) return;
+            
+            // Show loading spinner and hide form
+            document.getElementById('loadingSpinner').classList.remove('d-none');
+            form.classList.add('d-none');
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(userData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Save token to localStorage
+                    localStorage.setItem('token', data.token);
+                    
+                    // Redirect to dashboard after a delay
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 500);
+                } else {
+                    // Show error message
+                    document.getElementById('loadingSpinner').classList.add('d-none');
+                    form.classList.remove('d-none');
+                    
+                    const errorMessage = document.getElementById('errorMessage');
+                    errorMessage.textContent = data.message || 'Login failed. Please check your credentials.';
+                    document.getElementById('errorAlert').classList.remove('d-none');
+                }
+            } catch (error) {
+                // Hide loading spinner and show form
+                document.getElementById('loadingSpinner').classList.add('d-none');
+                form.classList.remove('d-none');
+                
+                const errorMessage = document.getElementById('errorMessage');
+                errorMessage.textContent = 'Network error. Please check your connection and try again.';
+                document.getElementById('errorAlert').classList.remove('d-none');
+            }
+        });
+    </script>
+</body>
+</html>

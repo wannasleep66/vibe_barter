@@ -30,6 +30,12 @@ exports.register = async (req, res, next) => {
   try {
     const { email, password, firstName, lastName } = req.body;
 
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return next(new AppError('User with this email already exists', 409));
+    }
+
     const user = await User.create({
       email,
       password,
@@ -39,6 +45,17 @@ exports.register = async (req, res, next) => {
 
     createSendToken(user, 201, res);
   } catch (error) {
+    // Handle duplicate key error (email uniqueness)
+    if (error.code === 11000) {
+      return next(new AppError('Email already exists', 409));
+    }
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(er => er.message);
+      return next(new AppError(`Validation error: ${errors.join(', ')}`, 400));
+    }
+
     next(error);
   }
 };

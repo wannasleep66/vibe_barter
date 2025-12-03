@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 
 const { logger } = require('./logger/logger');
@@ -34,6 +35,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Serve static files from frontend/public
+app.use(express.static(path.join(__dirname, '../frontend/public')));
+
 // Request logging
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path} - IP: ${req.ip}`);
@@ -43,6 +47,16 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+
+// Serve registration page
+app.get('/register', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/public/register.html'));
+});
+
+// Serve login page
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/public/login.html'));
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
