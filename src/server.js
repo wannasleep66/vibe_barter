@@ -16,6 +16,7 @@ const { logger } = require('./logger/logger');
 const errorHandler = require('./middleware/errorHandler');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
+const sessionRoutes = require('./routes/session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -68,6 +69,7 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/sessions', sessionRoutes);
 
 // Serve registration page
 app.get('/register', (req, res) => {
@@ -82,6 +84,11 @@ app.get('/login', (req, res) => {
 // Serve dashboard page
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/public/dashboard.html'));
+});
+
+// Serve session management page
+app.get('/sessions', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/public/session-management.html'));
 });
 
 // Health check endpoint
