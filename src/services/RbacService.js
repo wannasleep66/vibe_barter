@@ -22,6 +22,12 @@ class RbacService {
         { name: 'advertisement.read', resource: 'advertisement', action: 'read', description: 'View advertisements' },
         { name: 'advertisement.update', resource: 'advertisement', action: 'update', description: 'Update advertisements' },
         { name: 'advertisement.delete', resource: 'advertisement', action: 'delete', description: 'Delete advertisements' },
+
+        // Advertisement Media permissions
+        { name: 'advertisementMedia.create', resource: 'advertisementMedia', action: 'create', description: 'Upload advertisement media' },
+        { name: 'advertisementMedia.read', resource: 'advertisementMedia', action: 'read', description: 'View advertisement media' },
+        { name: 'advertisementMedia.update', resource: 'advertisementMedia', action: 'update', description: 'Update advertisement media' },
+        { name: 'advertisementMedia.delete', resource: 'advertisementMedia', action: 'delete', description: 'Delete advertisement media' },
         
         // Profile permissions
         { name: 'profile.create', resource: 'profile', action: 'create', description: 'Create profiles' },
@@ -94,6 +100,7 @@ class RbacService {
           permissions: [
             'profile.create', 'profile.read', 'profile.update', 'profile.delete',
             'advertisement.create', 'advertisement.read', 'advertisement.update', 'advertisement.delete',
+            'advertisementMedia.create', 'advertisementMedia.read', 'advertisementMedia.update', 'advertisementMedia.delete',
             'review.create', 'review.read', 'review.update', 'review.delete',
             'chat.create', 'chat.read',
             'application.create', 'application.read',
@@ -110,6 +117,7 @@ class RbacService {
           permissions: [
             'profile.create', 'profile.read', 'profile.update', 'profile.delete',
             'advertisement.create', 'advertisement.read', 'advertisement.update', 'advertisement.delete',
+            'advertisementMedia.create', 'advertisementMedia.read', 'advertisementMedia.update', 'advertisementMedia.delete',
             'review.create', 'review.read', 'review.update', 'review.delete',
             'chat.create', 'chat.read', 'chat.update',
             'application.create', 'application.read', 'application.update',
