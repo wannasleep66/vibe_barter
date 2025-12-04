@@ -150,4 +150,13 @@ advertisementSchema.index({ applicationCount: 1 }); // For application count fil
 advertisementSchema.index({ expiresAt: 1 }); // For expiration date filtering
 advertisementSchema.index({ createdAt: 1 }); // For creation date range filtering
 
+// Indexes for recommendation optimization
+advertisementSchema.index({
+  categoryId: 1,
+  type: 1,
+  tags: 1,
+  location: 1,
+  'rating.average': 1
+}); // Compound index for efficient recommendation queries
+
 module.exports = mongoose.model('Advertisement', advertisementSchema);

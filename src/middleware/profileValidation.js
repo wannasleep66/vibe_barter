@@ -332,6 +332,218 @@ module.exports = {
     }
 
     next();
+  },
+
+  validateUpdatePreferences: (req, res, next) => {
+    const {
+      preferredCategories,
+      preferredTypes,
+      preferredTags,
+      preferredLocations,
+      minRating,
+      maxDistance,
+      exchangePreferences,
+      excludeInactiveUsers,
+      excludeLowRatingUsers,
+      minAuthorRating,
+      preferenceScoreWeights
+    } = req.body;
+
+    // Validate preferredCategories if provided
+    if (preferredCategories !== undefined) {
+      if (!Array.isArray(preferredCategories)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Preferred categories must be an array of ObjectIds'
+        });
+      }
+      // Check each category ID is a valid ObjectId format (basic check)
+      for (const catId of preferredCategories) {
+        if (typeof catId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(catId)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Each category ID must be a valid ObjectId string'
+          });
+        }
+      }
+    }
+
+    // Validate preferredTypes if provided
+    if (preferredTypes !== undefined) {
+      if (!Array.isArray(preferredTypes)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Preferred types must be an array'
+        });
+      }
+      const validTypes = ['service', 'goods', 'skill', 'experience'];
+      for (const type of preferredTypes) {
+        if (typeof type !== 'string' || !validTypes.includes(type.toLowerCase())) {
+          return res.status(400).json({
+            success: false,
+            message: `Each type must be one of: ${validTypes.join(', ')}`
+          });
+        }
+      }
+    }
+
+    // Validate preferredTags if provided
+    if (preferredTags !== undefined) {
+      if (!Array.isArray(preferredTags)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Preferred tags must be an array of ObjectIds'
+        });
+      }
+      // Check each tag ID is a valid ObjectId format (basic check)
+      for (const tagId of preferredTags) {
+        if (typeof tagId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(tagId)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Each tag ID must be a valid ObjectId string'
+          });
+        }
+      }
+    }
+
+    // Validate preferredLocations if provided
+    if (preferredLocations !== undefined) {
+      if (!Array.isArray(preferredLocations)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Preferred locations must be an array of strings'
+        });
+      }
+      for (const location of preferredLocations) {
+        if (typeof location !== 'string' || location.trim().length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Each location must be a non-empty string'
+          });
+        }
+        if (location.length > 100) {
+          return res.status(400).json({
+            success: false,
+            message: 'Each location cannot exceed 100 characters'
+          });
+        }
+      }
+    }
+
+    // Validate minRating if provided
+    if (minRating !== undefined) {
+      if (typeof minRating !== 'number' || minRating < 0 || minRating > 5) {
+        return res.status(400).json({
+          success: false,
+          message: 'Min rating must be a number between 0 and 5'
+        });
+      }
+    }
+
+    // Validate maxDistance if provided
+    if (maxDistance !== undefined) {
+      if (typeof maxDistance !== 'number' || maxDistance < 1 || maxDistance > 10000) {
+        return res.status(400).json({
+          success: false,
+          message: 'Max distance must be a positive number (e.g., in kilometers)'
+        });
+      }
+    }
+
+    // Validate exchangePreferences if provided
+    if (exchangePreferences !== undefined) {
+      if (typeof exchangePreferences !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'Exchange preferences must be a string'
+        });
+      }
+      if (exchangePreferences.length > 500) {
+        return res.status(400).json({
+          success: false,
+          message: 'Exchange preferences cannot exceed 500 characters'
+        });
+      }
+    }
+
+    // Validate excludeInactiveUsers if provided
+    if (excludeInactiveUsers !== undefined) {
+      if (typeof excludeInactiveUsers !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          message: 'Exclude inactive users must be a boolean'
+        });
+      }
+    }
+
+    // Validate excludeLowRatingUsers if provided
+    if (excludeLowRatingUsers !== undefined) {
+      if (typeof excludeLowRatingUsers !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          message: 'Exclude low rating users must be a boolean'
+        });
+      }
+    }
+
+    // Validate minAuthorRating if provided
+    if (minAuthorRating !== undefined) {
+      if (typeof minAuthorRating !== 'number' || minAuthorRating < 0 || minAuthorRating > 5) {
+        return res.status(400).json({
+          success: false,
+          message: 'Min author rating must be a number between 0 and 5'
+        });
+      }
+    }
+
+    // Validate preferenceScoreWeights if provided
+    if (preferenceScoreWeights !== undefined) {
+      if (typeof preferenceScoreWeights !== 'object' || preferenceScoreWeights === null) {
+        return res.status(400).json({
+          success: false,
+          message: 'Preference score weights must be an object'
+        });
+      }
+
+      const { categoryMatch, typeMatch, tagMatch, locationMatch, ratingMatch } = preferenceScoreWeights;
+
+      if (categoryMatch !== undefined && (typeof categoryMatch !== 'number' || categoryMatch < 0 || categoryMatch > 1)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Category match weight must be a number between 0 and 1'
+        });
+      }
+
+      if (typeMatch !== undefined && (typeof typeMatch !== 'number' || typeMatch < 0 || typeMatch > 1)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Type match weight must be a number between 0 and 1'
+        });
+      }
+
+      if (tagMatch !== undefined && (typeof tagMatch !== 'number' || tagMatch < 0 || tagMatch > 1)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tag match weight must be a number between 0 and 1'
+        });
+      }
+
+      if (locationMatch !== undefined && (typeof locationMatch !== 'number' || locationMatch < 0 || locationMatch > 1)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Location match weight must be a number between 0 and 1'
+        });
+      }
+
+      if (ratingMatch !== undefined && (typeof ratingMatch !== 'number' || ratingMatch < 0 || ratingMatch > 1)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Rating match weight must be a number between 0 and 1'
+        });
+      }
+    }
+
+    next();
   }
 };
 

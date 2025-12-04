@@ -127,8 +127,8 @@ class AdvertisementArchivalService {
         isArchived: false,
         expiresAt: { $lt: cutoffTime, $gte: new Date() }
       })
-      .populate('ownerId', 'firstName lastName email')
-      .populate('categoryId', 'name');
+        .populate('ownerId', 'firstName lastName email')
+        .populate('categoryId', 'name');
 
       logger.info(`Found ${approachingExpiryAds.length} advertisements approaching expiry within ${hoursBefore} hours`);
       return approachingExpiryAds;

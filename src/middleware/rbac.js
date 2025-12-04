@@ -81,7 +81,7 @@ exports.hasPermission = (requiredPermission) => {
         next();
       } else {
         logger.warn(`User ${req.user.id} attempted to access resource without required permission: ${requiredPermission}`);
-        return next(new AppError(`You do not have permission to perform this action`, 403));
+        return next(new AppError('You do not have permission to perform this action', 403));
       }
     } catch (error) {
       logger.error('Permission check middleware error:', error);

@@ -1479,6 +1479,130 @@ class ProfileController {
       });
     }
   }
+  // Get user preferences
+  static async getPreferences(req, res) {
+    try {
+      // Get preferences from UserPreference model
+      const UserPreference = require('../models/UserPreference');
+      let userPreference = await UserPreference.findOne({ userId: req.user._id }).populate('preferredCategories preferredTags');
+
+      if (!userPreference) {
+        // If no preferences exist, return an empty preferences object
+        userPreference = {
+          preferredCategories: [],
+          preferredTypes: [],
+          preferredTags: [],
+          preferredLocations: [],
+          minRating: 0,
+          maxDistance: 50,
+          exchangePreferences: '',
+          excludeInactiveUsers: true,
+          excludeLowRatingUsers: false,
+          minAuthorRating: 0,
+          preferenceScoreWeights: {
+            categoryMatch: 0.3,
+            typeMatch: 0.2,
+            tagMatch: 0.2,
+            locationMatch: 0.15,
+            ratingMatch: 0.15
+          }
+        };
+      }
+
+      res.status(200).json({
+        success: true,
+        data: userPreference
+      });
+    } catch (error) {
+      logger.error(`Error getting preferences: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving preferences',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Update user preferences
+  static async updatePreferences(req, res) {
+    try {
+      const {
+        preferredCategories,
+        preferredTypes,
+        preferredTags,
+        preferredLocations,
+        minRating,
+        maxDistance,
+        exchangePreferences,
+        excludeInactiveUsers,
+        excludeLowRatingUsers,
+        minAuthorRating,
+        preferenceScoreWeights
+      } = req.body;
+
+      // Get the UserPreference model
+      const UserPreference = require('../models/UserPreference');
+
+      // Find existing preferences or create new
+      let userPreference = await UserPreference.findOne({ userId: req.user._id });
+
+      if (!userPreference) {
+        // Create new preferences
+        userPreference = new UserPreference({
+          userId: req.user._id,
+          preferredCategories: preferredCategories || [],
+          preferredTypes: preferredTypes || [],
+          preferredTags: preferredTags || [],
+          preferredLocations: preferredLocations || [],
+          minRating: minRating !== undefined ? minRating : 0,
+          maxDistance: maxDistance !== undefined ? maxDistance : 50,
+          exchangePreferences: exchangePreferences || '',
+          excludeInactiveUsers: excludeInactiveUsers !== undefined ? excludeInactiveUsers : true,
+          excludeLowRatingUsers: excludeLowRatingUsers !== undefined ? excludeLowRatingUsers : false,
+          minAuthorRating: minAuthorRating !== undefined ? minAuthorRating : 0,
+          preferenceScoreWeights: preferenceScoreWeights || {
+            categoryMatch: 0.3,
+            typeMatch: 0.2,
+            tagMatch: 0.2,
+            locationMatch: 0.15,
+            ratingMatch: 0.15
+          }
+        });
+      } else {
+        // Update existing preferences
+        if (preferredCategories) userPreference.preferredCategories = preferredCategories;
+        if (preferredTypes) userPreference.preferredTypes = preferredTypes;
+        if (preferredTags) userPreference.preferredTags = preferredTags;
+        if (preferredLocations) userPreference.preferredLocations = preferredLocations;
+        if (minRating !== undefined) userPreference.minRating = minRating;
+        if (maxDistance !== undefined) userPreference.maxDistance = maxDistance;
+        if (exchangePreferences !== undefined) userPreference.exchangePreferences = exchangePreferences;
+        if (excludeInactiveUsers !== undefined) userPreference.excludeInactiveUsers = excludeInactiveUsers;
+        if (excludeLowRatingUsers !== undefined) userPreference.excludeLowRatingUsers = excludeLowRatingUsers;
+        if (minAuthorRating !== undefined) userPreference.minAuthorRating = minAuthorRating;
+        if (preferenceScoreWeights) userPreference.preferenceScoreWeights = preferenceScoreWeights;
+      }
+
+      await userPreference.save();
+
+      // Clear recommendation cache for this user to reflect new preferences
+      const RecommendationService = require('../services/RecommendationService');
+      RecommendationService.clearUserCache(req.user._id);
+
+      res.status(200).json({
+        success: true,
+        message: 'Preferences updated successfully',
+        data: userPreference
+      });
+    } catch (error) {
+      logger.error(`Error updating preferences: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        message: 'Error updating preferences',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
 }
 
 module.exports = ProfileController;

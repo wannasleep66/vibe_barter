@@ -127,29 +127,29 @@ mongoose.connect(process.env.DB_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(async () => {
-  logger.info('Connected to MongoDB');
+  .then(async () => {
+    logger.info('Connected to MongoDB');
 
-  try {
+    try {
     // Initialize default roles and permissions
-    await rbacService.createDefaultRolesAndPermissions();
-    logger.info('Default roles and permissions initialized');
+      await rbacService.createDefaultRolesAndPermissions();
+      logger.info('Default roles and permissions initialized');
 
-    // Start automatic advertisement archival service
-    advertisementArchivalService.scheduleAutomaticArchival(60); // Run every hour
-    logger.info('Automatic advertisement archival service started');
-  } catch (initError) {
-    logger.error('Error initializing services:', initError);
-  }
+      // Start automatic advertisement archival service
+      advertisementArchivalService.scheduleAutomaticArchival(60); // Run every hour
+      logger.info('Automatic advertisement archival service started');
+    } catch (initError) {
+      logger.error('Error initializing services:', initError);
+    }
 
-  app.listen(PORT, () => {
-    logger.info(`Server running on port ${PORT}`);
-    logger.info(`Environment: ${process.env.NODE_ENV}`);
+    app.listen(PORT, () => {
+      logger.info(`Server running on port ${PORT}`);
+      logger.info(`Environment: ${process.env.NODE_ENV}`);
+    });
+  })
+  .catch(err => {
+    logger.error('Database connection error:', err);
+    process.exit(1);
   });
-})
-.catch(err => {
-  logger.error('Database connection error:', err);
-  process.exit(1);
-});
 
 module.exports = app;

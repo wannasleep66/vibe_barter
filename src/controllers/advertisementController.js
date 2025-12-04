@@ -4,7 +4,10 @@ const Category = require('../models/Category');
 const Tag = require('../models/Tag');
 const Profile = require('../models/Profile');
 const User = require('../models/User');
+const UserPreference = require('../models/UserPreference');
+const InteractionHistory = require('../models/InteractionHistory');
 const SearchService = require('../services/SearchService');
+const RecommendationService = require('../services/RecommendationService');
 const { logger } = require('../logger/logger');
 const AppError = require('../utils/AppError');
 
@@ -162,6 +165,7 @@ const advertisementController = {
         latitude,
         maxDistance,
         hasPortfolio,
+        languages,
         sortBy = 'createdAt',
         sortOrder = 'desc'
       } = req.query;
@@ -183,6 +187,11 @@ const advertisementController = {
       }
 
       // Handle category filtering (single category ID, multiple category IDs, with or without subcategories)
+      let includeSubcategories = false; // Define the variable
+      if (req.query.includeSubcategories !== undefined) {
+        includeSubcategories = req.query.includeSubcategories === 'true';
+      }
+
       if (categoryId) {
         if (Array.isArray(categoryId)) {
           // Multiple categories - match any of the specified categories
@@ -201,6 +210,11 @@ const advertisementController = {
         }
       }
       // Handle tag filtering (single tag ID, multiple tag IDs with AND/OR operators)
+      let tagOperator = 'or'; // Define the variable
+      if (req.query.tagOperator !== undefined) {
+        tagOperator = req.query.tagOperator;
+      }
+
       if (tagId) {
         if (Array.isArray(tagId)) {
           // Multiple tags - use OR or AND operator as specified
@@ -1167,8 +1181,8 @@ const advertisementController = {
         name: { $regex: regexQuery },
         isActive: true
       })
-      .sort({ usageCount: -1, name: 1 })
-      .limit(parseInt(limit));
+        .sort({ usageCount: -1, name: 1 })
+        .limit(parseInt(limit));
 
       res.status(200).json({
         success: true,
@@ -1180,6 +1194,40 @@ const advertisementController = {
       logger.error('Error searching tags:', error.message);
       next(error);
     }
+  }
+};
+
+// Get recommended advertisements based on user preferences
+advertisementController.getRecommendedAdvertisements = async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      minRelevanceScore = 0.1,
+      includePersonalized = true,
+      fallbackToGeneral = true,
+      excludeInteracted = true
+    } = req.query;
+
+    const result = await RecommendationService.getRecommendedAdvertisements(req.user._id, {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      minRelevanceScore: parseFloat(minRelevanceScore),
+      includePersonalized: includePersonalized !== 'false',
+      fallbackToGeneral: fallbackToGeneral !== 'false',
+      excludeInteracted: excludeInteracted !== 'false'
+    });
+
+    res.status(200).json({
+      success: true,
+      data: result.advertisements,
+      pagination: result.pagination,
+      filters: result.filters,
+      message: 'Recommended advertisements retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Error getting recommended advertisements:', error.message);
+    next(error);
   }
 };
 

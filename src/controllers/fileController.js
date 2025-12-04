@@ -74,8 +74,8 @@ class FileController {
           advertisementId: req.body.advertisementId,
           url: fileHandler.getFileUrl(req.file.filename),
           type: req.file.mimetype.startsWith('image') ? 'image' :
-                req.file.mimetype.startsWith('video') ? 'video' :
-                req.file.mimetype === 'application/pdf' ? 'document' :
+            req.file.mimetype.startsWith('video') ? 'video' :
+              req.file.mimetype === 'application/pdf' ? 'document' :
                 req.file.mimetype.includes('audio') ? 'audio' : 'other',
           filename: req.file.filename,
           size: req.file.size,
@@ -209,8 +209,8 @@ class FileController {
             advertisementId: req.body.advertisementId,
             url: fileHandler.getFileUrl(file.filename),
             type: file.mimetype.startsWith('image') ? 'image' :
-                  file.mimetype.startsWith('video') ? 'video' :
-                  file.mimetype === 'application/pdf' ? 'document' :
+              file.mimetype.startsWith('video') ? 'video' :
+                file.mimetype === 'application/pdf' ? 'document' :
                   file.mimetype.includes('audio') ? 'audio' : 'other',
             filename: file.filename,
             size: file.size,

@@ -46,8 +46,8 @@ class SearchService {
         advertisement.exchangePreferences,
         advertisement.location,
       ]
-      .filter(text => text) // Remove null/undefined values
-      .join(' ');
+        .filter(text => text) // Remove null/undefined values
+        .join(' ');
       
       // Add tag names to the searchable text
       if (advertisement.tags && advertisement.tags.length > 0) {
@@ -62,7 +62,7 @@ class SearchService {
       logger.info(`Updated search vector for advertisement ${advertisementId}`);
       return advertisement;
     } catch (error) {
-      logger.error(`Error updating search vector for advertisement:`, error.message);
+      logger.error('Error updating search vector for advertisement:', error.message);
       throw error;
     }
   }
