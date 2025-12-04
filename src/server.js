@@ -81,6 +81,7 @@ app.use('/api/files', fileRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/categories', require('./routes/category'));
 app.use('/api/tags', require('./routes/tag'));
+app.use('/api/advertisements', require('./routes/advertisements'));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static('uploads'));

@@ -1,6 +1,7 @@
 // src/utils/jwt.js
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const TokenBlacklist = require('../models/TokenBlacklist');
 const AppError = require('./AppError');
 
 const generateToken = (id, expiresIn = process.env.JWT_EXPIRES_IN) => {

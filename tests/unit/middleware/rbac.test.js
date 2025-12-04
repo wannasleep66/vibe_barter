@@ -1,5 +1,5 @@
 // tests/unit/middleware/rbac.test.js
-const { requirePermissions, checkResourcePermission, isAdmin, isModeratorOrAdmin } = require('../../../src/middleware/rbac');
+const { requirePermissions, hasPermission, isAdmin, isAdminOrModerator, isOwnResourceOrAdmin } = require('../../../src/middleware/rbac');
 const Role = require('../../../src/models/Role');
 const User = require('../../../src/models/User');
 const { logger } = require('../../../src/logger/logger');
