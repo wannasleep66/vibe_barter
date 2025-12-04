@@ -68,6 +68,11 @@ class ReviewService {
       // Update user's rating after new review is added
       await this.updateUserRating(review.revieweeId);
 
+      // If the review is for an advertisement, update the advertisement's rating
+      if (review.advertisementId) {
+        await this.updateAdvertisementRating(review.advertisementId);
+      }
+
       // If the review is for an application, update the application's rating
       if (review.applicationId) {
         await this.updateApplicationReviewStatus(review.applicationId);
@@ -289,12 +294,24 @@ class ReviewService {
         }
       }
 
+      // Store the old advertisementId if it existed
+      const oldAdvertisementId = review.advertisementId;
+
       // Update the review
       Object.assign(review, updates);
       await review.save();
 
       // Update user's rating after review is updated
       await this.updateUserRating(review.revieweeId);
+
+      // Update advertisement ratings if the review is associated with an advertisement
+      // This handles both updates to the same advertisement and changes to different advertisements
+      if (oldAdvertisementId) {
+        await this.updateAdvertisementRating(oldAdvertisementId);
+      }
+      if (review.advertisementId && review.advertisementId.toString() !== oldAdvertisementId?.toString()) {
+        await this.updateAdvertisementRating(review.advertisementId);
+      }
 
       // Populate and return the updated review
       const populatedReview = await Review.findById(review._id)
@@ -329,14 +346,20 @@ class ReviewService {
         throw new AppError('Review not found or you are not the reviewer', 404);
       }
 
-      // Store the revieweeId before deletion to update their rating
+      // Store the revieweeId and advertisementId before deletion
       const revieweeId = review.revieweeId;
-      
+      const advertisementId = review.advertisementId;
+
       // Delete the review
       await Review.findByIdAndDelete(reviewId);
 
       // Update user's rating after review is deleted
       await this.updateUserRating(revieweeId);
+
+      // Update advertisement rating if the review was associated with an advertisement
+      if (advertisementId) {
+        await this.updateAdvertisementRating(advertisementId);
+      }
 
       return true;
     } catch (error) {
@@ -463,11 +486,49 @@ class ReviewService {
   }
 
   /**
-   * Update advertisement's average rating based on reviews of the owner
+   * Update advertisement's average rating based on reviews specifically for this advertisement
    * @param {ObjectId} advertisementId - ID of the advertisement to update
    * @returns {Promise<Advertisement>} Updated advertisement object
    */
   async updateAdvertisementRating(advertisementId) {
+    try {
+      const advertisement = await Advertisement.findById(advertisementId);
+      if (!advertisement) {
+        throw new AppError('Advertisement not found', 404);
+      }
+
+      // Calculate the average rating from reviews specifically for this advertisement
+      const ratingStats = await Review.aggregate([
+        { $match: { advertisementId: advertisement._id } },
+        { $group: { _id: null, avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
+      ]);
+
+      const avgRating = ratingStats.length > 0 ? ratingStats[0].avgRating : 0;
+      const count = ratingStats.length > 0 ? ratingStats[0].count : 0;
+
+      // Update the advertisement's rating
+      advertisement.rating = {
+        average: parseFloat(avgRating.toFixed(2)), // Round to 2 decimal places
+        count: count
+      };
+
+      await advertisement.save();
+
+      return advertisement;
+    } catch (error) {
+      logger.error('Error updating advertisement rating:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Update advertisement's rating based on reviews related to the owner (alternative method)
+   * This can be used when we want to show the owner's overall reputation for the ad
+   * @param {ObjectId} advertisementId - ID of the advertisement to update
+   * @param {Boolean} useOwnerRating - Whether to use the owner's overall rating instead of ad-specific rating
+   * @returns {Promise<Advertisement>} Updated advertisement object
+   */
+  async updateAdvertisementOwnerRating(advertisementId, useOwnerRating = true) {
     try {
       const advertisement = await Advertisement.findById(advertisementId);
       if (!advertisement) {
@@ -485,15 +546,54 @@ class ReviewService {
 
       // Update the advertisement's rating to match owner's rating
       advertisement.rating = {
-        average: avgRating,
+        average: parseFloat(avgRating.toFixed(2)), // Round to 2 decimal places
         count: count
       };
-      
+
       await advertisement.save();
 
       return advertisement;
     } catch (error) {
-      logger.error('Error updating advertisement rating:', error.message);
+      logger.error('Error updating advertisement owner rating:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the rating information for an advertisement
+   * @param {ObjectId} advertisementId - ID of the advertisement
+   * @returns {Promise<Object>} Rating information including average, count, and distribution
+   */
+  async getAdvertisementRatingInfo(advertisementId) {
+    try {
+      // Get all reviews for this advertisement
+      const reviews = await Review.find({ advertisementId });
+
+      if (reviews.length === 0) {
+        return {
+          average: 0,
+          count: 0,
+          distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+        };
+      }
+
+      // Calculate average
+      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+      const average = totalRating / reviews.length;
+
+      // Calculate distribution
+      const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      reviews.forEach(review => {
+        distribution[review.rating] = (distribution[review.rating] || 0) + 1;
+      });
+
+      return {
+        average: parseFloat(average.toFixed(2)),
+        count: reviews.length,
+        distribution
+      };
+    } catch (error) {
+      logger.error('Error getting advertisement rating info:', error.message);
       throw error;
     }
   }

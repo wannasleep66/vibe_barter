@@ -1197,6 +1197,29 @@ const advertisementController = {
   }
 };
 
+// Get advertisement rating information
+advertisementController.getAdvertisementRating = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Import ReviewService here to avoid circular dependencies
+    const ReviewService = require('../services/ReviewService');
+
+    const ratingInfo = await ReviewService.getAdvertisementRatingInfo(id);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        advertisementId: id,
+        rating: ratingInfo
+      }
+    });
+  } catch (error) {
+    logger.error('Error getting advertisement rating:', error.message);
+    next(error);
+  }
+};
+
 // Get recommended advertisements based on user preferences
 advertisementController.getRecommendedAdvertisements = async (req, res, next) => {
   try {

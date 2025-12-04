@@ -75,4 +75,10 @@ router.get('/recommended',
   advertisementController.getRecommendedAdvertisements
 );
 
+// Get rating information for an advertisement
+router.get('/:id/rating',
+  validateAdvertisementId,
+  advertisementController.getAdvertisementRating
+);
+
 module.exports = router;
