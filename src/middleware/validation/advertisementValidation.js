@@ -97,9 +97,25 @@ const getAdvertisementsQuerySchema = Joi.object({
   tagId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
   location: Joi.string().max(100).optional().allow(''),
   isUrgent: Joi.boolean().optional(),
+  isArchived: Joi.string().valid('true', 'false', 'any').optional(),
   isActive: Joi.string().valid('true', 'false', 'any').optional().default('true'),
-  sortBy: Joi.string().valid('createdAt', 'updatedAt', 'title', 'views', 'expiresAt').optional().default('createdAt'),
-  sortOrder: Joi.string().valid('asc', 'desc').optional().default('desc')
+  ownerId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(), // For admin search
+  profileId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
+  minRating: Joi.number().min(0).max(5).optional(), // Minimum average rating
+  maxRating: Joi.number().min(0).max(5).optional(), // Maximum average rating
+  minViews: Joi.number().integer().min(0).optional(), // Minimum number of views
+  maxViews: Joi.number().integer().min(0).optional(), // Maximum number of views
+  minApplications: Joi.number().integer().min(0).optional(), // Minimum number of applications
+  maxApplications: Joi.number().integer().min(0).optional(), // Maximum number of applications
+  expiresBefore: Joi.date().iso().optional(), // Expires before this date
+  expiresAfter: Joi.date().iso().optional(), // Expires after this date
+  minCreatedAt: Joi.date().iso().optional(), // Created after this date
+  maxCreatedAt: Joi.date().iso().optional(), // Created before this date
+  sortBy: Joi.string().valid('createdAt', 'updatedAt', 'title', 'views', 'expiresAt', 'rating.average', 'applicationCount').optional().default('createdAt'),
+  sortOrder: Joi.string().valid('asc', 'desc').optional().default('desc'),
+  longitude: Joi.number().min(-180).max(180).optional(), // For geo-location search
+  latitude: Joi.number().min(-90).max(90).optional(),   // For geo-location search
+  maxDistance: Joi.number().min(0).optional().default(10000) // Max distance in meters for geo-search
 });
 
 // Validation schema for advertisement ID parameter

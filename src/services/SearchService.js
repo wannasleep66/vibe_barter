@@ -57,7 +57,20 @@ class SearchService {
         tagId,
         location,
         isUrgent,
+        isArchived,
         isActive = true,
+        ownerId,
+        profileId,
+        minRating,
+        maxRating,
+        minViews,
+        maxViews,
+        minApplications,
+        maxApplications,
+        expiresBefore,
+        expiresAfter,
+        minCreatedAt,
+        maxCreatedAt,
         sortBy = 'createdAt',
         sortOrder = 'desc'
       } = options;
@@ -69,16 +82,62 @@ class SearchService {
         filter.isActive = isActive === 'true';
       }
 
+      if (isArchived !== undefined) {
+        if (isArchived === 'any') {
+          delete filter.isActive; // Remove isActive filter to show all
+        } else {
+          filter.isArchived = isArchived === 'true';
+        }
+      }
+
       if (categoryId) filter.categoryId = categoryId;
       if (tagId) filter.tags = { $in: [tagId] };
       if (type) filter.type = type;
       if (location) filter.location = { $regex: location, $options: 'i' };
       if (isUrgent) filter.isUrgent = isUrgent === 'true';
+      if (ownerId) filter.ownerId = ownerId;
+      if (profileId) filter.profileId = profileId;
+
+      // Apply additional filters
+      // Rating filters
+      if (minRating !== undefined || maxRating !== undefined) {
+        filter['rating.average'] = {};
+        if (minRating !== undefined) filter['rating.average'].$gte = parseFloat(minRating);
+        if (maxRating !== undefined) filter['rating.average'].$lte = parseFloat(maxRating);
+      }
+
+      // Views filters
+      if (minViews !== undefined || maxViews !== undefined) {
+        if (!filter.views) filter.views = {};
+        if (minViews !== undefined) filter.views.$gte = parseInt(minViews);
+        if (maxViews !== undefined) filter.views.$lte = parseInt(maxViews);
+      }
+
+      // Application count filters
+      if (minApplications !== undefined || maxApplications !== undefined) {
+        if (!filter.applicationCount) filter.applicationCount = {};
+        if (minApplications !== undefined) filter.applicationCount.$gte = parseInt(minApplications);
+        if (maxApplications !== undefined) filter.applicationCount.$lte = parseInt(maxApplications);
+      }
+
+      // Expiration date filters
+      if (expiresBefore || expiresAfter) {
+        filter.expiresAt = {};
+        if (expiresBefore) filter.expiresAt.$lte = new Date(expiresBefore);
+        if (expiresAfter) filter.expiresAt.$gte = new Date(expiresAfter);
+      }
+
+      // Created at filters
+      if (minCreatedAt || maxCreatedAt) {
+        if (!filter.createdAt) filter.createdAt = {};
+        if (minCreatedAt) filter.createdAt.$gte = new Date(minCreatedAt);
+        if (maxCreatedAt) filter.createdAt.$lte = new Date(maxCreatedAt);
+      }
 
       // Enhanced search that looks in multiple fields
       if (query) {
         const searchRegex = new RegExp(query, 'i');
-        
+
         // Create a complex search filter
         filter.$or = [
           { title: { $regex: searchRegex } },

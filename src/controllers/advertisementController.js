@@ -119,7 +119,23 @@ const advertisementController = {
         tagId,
         location,
         isUrgent,
+        isArchived,
         isActive = true,
+        ownerId,
+        profileId,
+        minRating,
+        maxRating,
+        minViews,
+        maxViews,
+        minApplications,
+        maxApplications,
+        expiresBefore,
+        expiresAfter,
+        minCreatedAt,
+        maxCreatedAt,
+        longitude,
+        latitude,
+        maxDistance,
         sortBy = 'createdAt',
         sortOrder = 'desc'
       } = req.query;
@@ -132,9 +148,10 @@ const advertisementController = {
       }
 
       // Allow filtering by archived status as well
-      if (isArchived !== undefined && req.user) {
-        // Only allow users to see archived ads if they are the owner or an admin/moderator
-        if (req.user.role === 'admin' || req.user.role === 'moderator') {
+      if (isArchived !== undefined) {
+        if (isArchived === 'any') {
+          delete filter.isActive; // Remove isActive filter to show all
+        } else {
           filter.isArchived = isArchived === 'true';
         }
       }
@@ -144,6 +161,45 @@ const advertisementController = {
       if (type) filter.type = type;
       if (location) filter.location = { $regex: location, $options: 'i' };
       if (isUrgent) filter.isUrgent = isUrgent === 'true';
+
+      // Additional filters that were extracted from the query parameters
+      if (ownerId) filter.ownerId = ownerId;
+      if (profileId) filter.profileId = profileId;
+
+      // Rating filters
+      if (minRating !== undefined || maxRating !== undefined) {
+        filter['rating.average'] = {};
+        if (minRating !== undefined) filter['rating.average'].$gte = parseFloat(minRating);
+        if (maxRating !== undefined) filter['rating.average'].$lte = parseFloat(maxRating);
+      }
+
+      // Views filters
+      if (minViews !== undefined || maxViews !== undefined) {
+        if (!filter.views) filter.views = {};
+        if (minViews !== undefined) filter.views.$gte = parseInt(minViews);
+        if (maxViews !== undefined) filter.views.$lte = parseInt(maxViews);
+      }
+
+      // Application count filters
+      if (minApplications !== undefined || maxApplications !== undefined) {
+        if (!filter.applicationCount) filter.applicationCount = {};
+        if (minApplications !== undefined) filter.applicationCount.$gte = parseInt(minApplications);
+        if (maxApplications !== undefined) filter.applicationCount.$lte = parseInt(maxApplications);
+      }
+
+      // Expiration date filters
+      if (expiresBefore || expiresAfter) {
+        filter.expiresAt = {};
+        if (expiresBefore) filter.expiresAt.$lte = new Date(expiresBefore);
+        if (expiresAfter) filter.expiresAt.$gte = new Date(expiresAfter);
+      }
+
+      // Created at filters
+      if (minCreatedAt || maxCreatedAt) {
+        if (!filter.createdAt) filter.createdAt = {};
+        if (minCreatedAt) filter.createdAt.$gte = new Date(minCreatedAt);
+        if (maxCreatedAt) filter.createdAt.$lte = new Date(maxCreatedAt);
+      }
 
       // Use enhanced search if search query is provided
       if (search) {
@@ -167,14 +223,32 @@ const advertisementController = {
           filters: { search, type, categoryId, tagId, location, isUrgent, isActive, sortBy, sortOrder }
         });
       } else {
-        // For non-search queries, build the standard filter
+        // For non-search queries, build the standard filter with geo-location if provided
+        let advertisementsQuery;
+        if (longitude && latitude) {
+          // Geographic search using coordinates
+          advertisementsQuery = Advertisement.find({
+            ...filter,
+            coordinates: {
+              $geoWithin: {
+                $centerSphere: [
+                  [parseFloat(longitude), parseFloat(latitude)],
+                  parseFloat(maxDistance || 10000) / 6378137 // Convert meters to radians
+                ]
+              }
+            }
+          });
+        } else {
+          advertisementsQuery = Advertisement.find(filter);
+        }
+
         // Calculate pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         // Set up query with populate
         const sortObj = {};
         sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
-        const advertisementsQuery = Advertisement.find(filter)
+        advertisementsQuery
           .populate('ownerId', 'firstName lastName email')
           .populate('categoryId', 'name description')
           .populate('tags', 'name')
@@ -186,7 +260,12 @@ const advertisementController = {
         const advertisements = await advertisementsQuery;
 
         // Get total count for pagination
-        const total = await Advertisement.countDocuments(filter);
+        // Use the same filters for count but without geo-location for efficiency
+        let totalCountFilter = filter;
+        if (longitude && latitude) {
+          totalCountFilter = { ...filter }; // Count total without geo filter
+        }
+        const total = await Advertisement.countDocuments(totalCountFilter);
 
         res.status(200).json({
           success: true,
@@ -199,7 +278,33 @@ const advertisementController = {
             hasNext: parseInt(page) * parseInt(limit) < total,
             hasPrev: parseInt(page) > 1
           },
-          filters: { search, type, categoryId, tagId, location, isUrgent, isActive, sortBy, sortOrder }
+          filters: {
+            search,
+            type,
+            categoryId,
+            tagId,
+            location,
+            isUrgent,
+            isArchived,
+            isActive,
+            ownerId,
+            profileId,
+            minRating,
+            maxRating,
+            minViews,
+            maxViews,
+            minApplications,
+            maxApplications,
+            expiresBefore,
+            expiresAfter,
+            minCreatedAt,
+            maxCreatedAt,
+            longitude,
+            latitude,
+            maxDistance,
+            sortBy,
+            sortOrder
+          }
         });
       }
     } catch (error) {
