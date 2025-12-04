@@ -98,7 +98,11 @@ const getAdvertisementsQuerySchema = Joi.object({
     Joi.array().items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/)) // Multiple category IDs
   ).optional(),
   includeSubcategories: Joi.boolean().optional().default(false), // Include subcategories in results
-  tagId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
+  tagId: Joi.alternatives().try(
+    Joi.string().pattern(/^[0-9a-fA-F]{24}$/), // Single tag ID
+    Joi.array().items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/)) // Multiple tag IDs
+  ).optional(),
+  tagOperator: Joi.string().valid('and', 'or').optional().default('or'), // How to combine multiple tags ('and' or 'or')
   location: Joi.string().max(100).optional().allow(''),
   isUrgent: Joi.boolean().optional(),
   isArchived: Joi.string().valid('true', 'false', 'any').optional(),

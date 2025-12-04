@@ -97,6 +97,7 @@ class SearchService {
         hasPortfolio,
         languages, // Added languages parameter
         includeSubcategories = false, // Include subcategories in search
+        tagOperator = 'or', // How to combine multiple tags ('and' or 'or')
         sortBy = 'createdAt',
         sortOrder = 'desc'
       } = options;
@@ -117,7 +118,22 @@ class SearchService {
       }
 
       if (categoryId) filter.categoryId = categoryId;
-      if (tagId) filter.tags = { $in: [tagId] };
+      // Handle tag filtering (single tag ID, multiple tag IDs with AND/OR operators)
+      if (tagId) {
+        if (Array.isArray(tagId)) {
+          // Multiple tags - use OR or AND operator as specified
+          if (tagOperator === 'and') {
+            // For AND operation, find advertisements that have ALL specified tags
+            filter.tags = { $all: tagId };  // $all ensures all tags are present
+          } else {
+            // For OR operation (default), find advertisements that have ANY of the specified tags
+            filter.tags = { $in: tagId };   // $in ensures any of the tags match
+          }
+        } else {
+          // Single tag - match advertisements with this specific tag
+          filter.tags = { $in: [tagId] };   // Use $in with single-element array for consistency
+        }
+      }
       if (type) filter.type = type;
       if (location) filter.location = { $regex: location, $options: 'i' };
       if (isUrgent) filter.isUrgent = isUrgent === 'true';
@@ -206,7 +222,7 @@ class SearchService {
         const pipeline = [];
 
         // Apply category filtering with subcategories if needed
-        const adjustedFilter = { ...filter };
+        let adjustedFilter = { ...filter };
         if (categoryId && includeSubcategories) {
           if (Array.isArray(categoryId)) {
             // Multiple categories - get children for each
@@ -223,7 +239,24 @@ class SearchService {
           }
         }
 
-        // Match phase with adjusted filters (handling categories with subcategories if needed)
+        // Apply tag filtering with proper operator if needed
+        if (tagId) {
+          if (Array.isArray(tagId)) {
+            // Multiple tags - use OR or AND operator as specified
+            if (tagOperator === 'and') {
+              // For AND operation, find advertisements that have ALL specified tags
+              adjustedFilter.tags = { $all: tagId };  // $all ensures all tags are present
+            } else {
+              // For OR operation (default), find advertisements that have ANY of the specified tags
+              adjustedFilter.tags = { $in: tagId };   // $in ensures any of the tags match
+            }
+          } else {
+            // Single tag - match advertisements with this specific tag
+            adjustedFilter.tags = { $in: [tagId] };   // Use $in with single-element array for consistency
+          }
+        }
+
+        // Match phase with adjusted filters (handling categories with subcategories and tags if needed)
         pipeline.push({ $match: adjustedFilter });
 
         // Join with Profile collection to check for portfolio items or languages
@@ -396,7 +429,7 @@ class SearchService {
         // Use regular find without hasPortfolio or languages filter
         // Get advertisements with filtering and sorting
 
-        // If we need to include subcategories, adjust the filter
+        // If we need to include subcategories or handle tags, adjust the filter
         let effectiveFilter = filter;
         if (categoryId && includeSubcategories) {
           if (Array.isArray(categoryId)) {
@@ -411,6 +444,23 @@ class SearchService {
             // Single category - get its children
             const categoryIds = await getCategoryWithChildren(categoryId);
             effectiveFilter = { ...filter, categoryId: { $in: categoryIds } };
+          }
+        }
+
+        // Apply tag filtering if specified
+        if (tagId) {
+          if (Array.isArray(tagId)) {
+            // Multiple tags - use OR or AND operator as specified
+            if (tagOperator === 'and') {
+              // For AND operation, find advertisements that have ALL specified tags
+              effectiveFilter.tags = { $all: tagId };  // $all ensures all tags are present
+            } else {
+              // For OR operation (default), find advertisements that have ANY of the specified tags
+              effectiveFilter.tags = { $in: tagId };   // $in ensures any of the tags match
+            }
+          } else {
+            // Single tag - match advertisements with this specific tag
+            effectiveFilter.tags = { $in: [tagId] };   // Use $in with single-element array for consistency
           }
         }
 

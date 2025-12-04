@@ -198,7 +198,22 @@ const advertisementController = {
           }
         }
       }
-      if (tagId) filter.tags = { $in: [tagId] };
+      // Handle tag filtering (single tag ID, multiple tag IDs with AND/OR operators)
+      if (tagId) {
+        if (Array.isArray(tagId)) {
+          // Multiple tags - use OR or AND operator as specified
+          if (tagOperator === 'and') {
+            // For AND operation, find advertisements that have ALL specified tags
+            filter.tags = { $all: tagId };  // $all ensures all tags are present
+          } else {
+            // For OR operation (default), find advertisements that have ANY of the specified tags
+            filter.tags = { $in: tagId };   // $in ensures any of the tags match
+          }
+        } else {
+          // Single tag - match advertisements with this specific tag
+          filter.tags = { $in: [tagId] };   // Use $in with single-element array for consistency
+        }
+      }
       if (type) filter.type = type;
       if (location) filter.location = { $regex: location, $options: 'i' };
       if (isUrgent) filter.isUrgent = isUrgent === 'true';
@@ -923,6 +938,66 @@ const advertisementController = {
         return next(new AppError('Invalid advertisement ID format', 400));
       }
       logger.error('Error activating advertisement:', error.message);
+      next(error);
+    }
+  },
+
+  // Get popular tags for filtering suggestions
+  getPopularTags: async (req, res, next) => {
+    try {
+      const { limit = 10, search } = req.query;
+
+      // Build filter for tags
+      const filter = { isActive: true };
+      if (search) {
+        filter.name = { $regex: search, $options: 'i' };
+      }
+
+      // Find popular tags ordered by usage count
+      const tags = await Tag.find(filter)
+        .sort({ usageCount: -1, name: 1 })
+        .limit(parseInt(limit));
+
+      res.status(200).json({
+        success: true,
+        data: tags,
+        count: tags.length
+      });
+    } catch (error) {
+      logger.error('Error getting popular tags:', error.message);
+      next(error);
+    }
+  },
+
+  // Search tags by name for autocomplete functionality
+  searchTags: async (req, res, next) => {
+    try {
+      const { query, limit = 10 } = req.query;
+
+      if (!query || query.trim().length < 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Query parameter must be provided and at least 1 character long'
+        });
+      }
+
+      // Search for tags by name
+      const regexQuery = new RegExp(query.trim(), 'i');
+      const tags = await Tag.find({
+        name: { $regex: regexQuery },
+        isActive: true
+      })
+      .sort({ usageCount: -1, name: 1 })
+      .limit(parseInt(limit));
+
+      res.status(200).json({
+        success: true,
+        data: tags,
+        count: tags.length,
+        query
+      });
+    } catch (error) {
+      logger.error('Error searching tags:', error.message);
       next(error);
     }
   }

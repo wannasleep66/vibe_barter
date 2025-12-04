@@ -83,6 +83,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/categories', require('./routes/category'));
 app.use('/api/tags', require('./routes/tag'));
 app.use('/api/advertisements', require('./routes/advertisements'));
+app.use('/api/advertisement-tags', require('./routes/advertisementTags'));
 app.use('/api/advertisement-media', require('./routes/advertisementMedia'));
 
 // Serve uploaded files statically
