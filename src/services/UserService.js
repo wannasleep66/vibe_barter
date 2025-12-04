@@ -104,7 +104,7 @@ class UserService {
       logger.error('Error getting all users:', error.message);
       throw new AppError('Error retrieving users', 500);
     }
-  },
+  }
 
   // Get filtered users with pagination
   async getFilteredUsers(filter = {}, page = 1, limit = 10) {

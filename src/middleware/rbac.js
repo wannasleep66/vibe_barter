@@ -132,6 +132,46 @@ exports.isAdminOrModerator = async (req, res, next) => {
 };
 
 /**
+ * Middleware to check if user has permission for specific resource action
+ * @param {string} resource - The resource type (e.g., 'user', 'advertisement')
+ * @param {string} action - The action to perform (e.g., 'create', 'read', 'update', 'delete')
+ */
+exports.checkResourcePermission = (resource, action) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return next(new AppError('You are not logged in! Please log in to get access.', 401));
+      }
+
+      // Get user's role and its permissions
+      const userRole = await Role.findOne({ name: req.user.role })
+        .populate('permissions')
+        .exec();
+
+      if (!userRole) {
+        return next(new AppError('User role not found.', 401));
+      }
+
+      // Get user's permission names
+      const userPermissionNames = userRole.permissions.map(permission => permission.name);
+
+      // Check if user has wildcard permission or specific resource permission
+      const requiredPermission = `${resource}.${action}`;
+
+      if (userPermissionNames.includes('*') || userPermissionNames.includes(requiredPermission)) {
+        next();
+      } else {
+        logger.warn(`User ${req.user.id} attempted to ${action} ${resource} without permission`);
+        return next(new AppError(`You do not have permission to ${action} ${resource}`, 403));
+      }
+    } catch (error) {
+      logger.error('Resource permission check middleware error:', error);
+      return next(new AppError('Access control error. Please try again later.', 500));
+    }
+  };
+};
+
+/**
  * Middleware to check if user is accessing their own resource or has admin privileges
  */
 exports.isOwnResourceOrAdmin = (resourceIdField = 'id') => {

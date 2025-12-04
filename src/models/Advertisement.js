@@ -100,7 +100,7 @@ const advertisementSchema = new mongoose.Schema({
     type: Date
   },
   searchVector: {
-    type: String // For full-text search optimization
+    type: String // For full-text search optimization - stores tag names, location, etc.
   }
 }, {
   timestamps: true
@@ -142,5 +142,12 @@ advertisementSchema.index({ coordinates: '2dsphere' });
 
 // Index for profile
 advertisementSchema.index({ profileId: 1 });
+
+// Indexes for advanced filtering
+advertisementSchema.index({ 'rating.average': 1 }); // For rating filtering
+advertisementSchema.index({ views: 1 }); // For views filtering
+advertisementSchema.index({ applicationCount: 1 }); // For application count filtering
+advertisementSchema.index({ expiresAt: 1 }); // For expiration date filtering
+advertisementSchema.index({ createdAt: 1 }); // For creation date range filtering
 
 module.exports = mongoose.model('Advertisement', advertisementSchema);

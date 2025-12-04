@@ -22,6 +22,7 @@ const permissionRoutes = require('./routes/permissions');
 const fileRoutes = require('./routes/files');
 const profileRoutes = require('./routes/profile');
 const rbacService = require('./services/RbacService');
+const advertisementArchivalService = require('./services/AdvertisementArchivalService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -79,6 +80,11 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/categories', require('./routes/category'));
+app.use('/api/tags', require('./routes/tag'));
+app.use('/api/advertisements', require('./routes/advertisements'));
+app.use('/api/advertisement-tags', require('./routes/advertisementTags'));
+app.use('/api/advertisement-media', require('./routes/advertisementMedia'));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static('uploads'));
@@ -128,8 +134,12 @@ mongoose.connect(process.env.DB_URL, {
     // Initialize default roles and permissions
     await rbacService.createDefaultRolesAndPermissions();
     logger.info('Default roles and permissions initialized');
+
+    // Start automatic advertisement archival service
+    advertisementArchivalService.scheduleAutomaticArchival(60); // Run every hour
+    logger.info('Automatic advertisement archival service started');
   } catch (initError) {
-    logger.error('Error initializing default roles and permissions:', initError);
+    logger.error('Error initializing services:', initError);
   }
 
   app.listen(PORT, () => {
