@@ -4,6 +4,7 @@ const Category = require('../models/Category');
 const Tag = require('../models/Tag');
 const Profile = require('../models/Profile');
 const User = require('../models/User');
+const SearchService = require('../services/SearchService');
 const { logger } = require('../logger/logger');
 const AppError = require('../utils/AppError');
 
@@ -81,6 +82,9 @@ const advertisementController = {
       // Create the advertisement
       const advertisement = await Advertisement.create(advertisementData);
 
+      // Update search vector to include tag names and other searchable fields
+      await SearchService.updateAdvertisementSearchVector(advertisement._id);
+
       // Populate the response with related data
       const populatedAdvertisement = await Advertisement.findById(advertisement._id)
         .populate('ownerId', 'firstName lastName email')
@@ -141,49 +145,63 @@ const advertisementController = {
       if (location) filter.location = { $regex: location, $options: 'i' };
       if (isUrgent) filter.isUrgent = isUrgent === 'true';
 
-      // Add text search if provided
+      // Use enhanced search if search query is provided
       if (search) {
-        filter.$text = { $search: search };
+        const result = await SearchService.searchAdvertisements(search, {
+          page,
+          limit,
+          type,
+          categoryId,
+          tagId,
+          location,
+          isUrgent,
+          isActive,
+          sortBy,
+          sortOrder
+        });
+
+        res.status(200).json({
+          success: true,
+          data: result.advertisements,
+          pagination: result.pagination,
+          filters: { search, type, categoryId, tagId, location, isUrgent, isActive, sortBy, sortOrder }
+        });
+      } else {
+        // For non-search queries, build the standard filter
+        // Calculate pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        // Set up query with populate
+        const sortObj = {};
+        sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+        const advertisementsQuery = Advertisement.find(filter)
+          .populate('ownerId', 'firstName lastName email')
+          .populate('categoryId', 'name description')
+          .populate('tags', 'name')
+          .populate('profileId', 'firstName lastName')
+          .sort(sortObj)
+          .skip(skip)
+          .limit(parseInt(limit));
+
+        const advertisements = await advertisementsQuery;
+
+        // Get total count for pagination
+        const total = await Advertisement.countDocuments(filter);
+
+        res.status(200).json({
+          success: true,
+          data: advertisements,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            pages: Math.ceil(total / parseInt(limit)),
+            hasNext: parseInt(page) * parseInt(limit) < total,
+            hasPrev: parseInt(page) > 1
+          },
+          filters: { search, type, categoryId, tagId, location, isUrgent, isActive, sortBy, sortOrder }
+        });
       }
-
-      // Determine sort order
-      const sort = {};
-      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
-
-      // Calculate pagination
-      const skip = (parseInt(page) - 1) * parseInt(limit);
-
-      // Get advertisements with filtering and sorting
-      let advertisementsQuery = Advertisement.find(filter)
-        .populate('ownerId', 'firstName lastName email')
-        .populate('categoryId', 'name description')
-        .populate('tags', 'name')
-        .populate('profileId', 'firstName lastName');
-
-      if (Object.keys(sort).length > 0) {
-        advertisementsQuery = advertisementsQuery.sort(sort);
-      }
-
-      const advertisements = await advertisementsQuery
-        .skip(skip)
-        .limit(parseInt(limit));
-
-      // Get total count for pagination
-      const total = await Advertisement.countDocuments(filter);
-
-      res.status(200).json({
-        success: true,
-        data: advertisements,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          pages: Math.ceil(total / parseInt(limit)),
-          hasNext: parseInt(page) * parseInt(limit) < total,
-          hasPrev: parseInt(page) > 1
-        },
-        filters: { search, type, categoryId, tagId, location, isUrgent, isActive, sortBy, sortOrder }
-      });
     } catch (error) {
       logger.error('Error getting advertisements:', error.message);
       next(error);
@@ -280,6 +298,9 @@ const advertisementController = {
       // Update the advertisement
       Object.assign(advertisement, updateData);
       await advertisement.save();
+
+      // Update search vector to include tag names and other searchable fields
+      await SearchService.updateAdvertisementSearchVector(advertisement._id);
 
       // Populate and return updated advertisement
       const updatedAdvertisement = await Advertisement.findById(advertisement._id)

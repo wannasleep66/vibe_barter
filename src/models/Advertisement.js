@@ -100,7 +100,7 @@ const advertisementSchema = new mongoose.Schema({
     type: Date
   },
   searchVector: {
-    type: String // For full-text search optimization
+    type: String // For full-text search optimization - stores tag names, location, etc.
   }
 }, {
   timestamps: true
