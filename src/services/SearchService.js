@@ -94,6 +94,8 @@ class SearchService {
         expiresAfter,
         minCreatedAt,
         maxCreatedAt,
+        minAuthorRating,
+        maxAuthorRating,
         hasPortfolio,
         languages, // Added languages parameter
         includeSubcategories = false, // Include subcategories in search
@@ -160,7 +162,7 @@ class SearchService {
       }
 
       // Apply additional filters
-      // Rating filters
+      // Advertisement rating filters
       if (minRating !== undefined || maxRating !== undefined) {
         filter['rating.average'] = {};
         if (minRating !== undefined) filter['rating.average'].$gte = parseFloat(minRating);
@@ -217,8 +219,8 @@ class SearchService {
       // Calculate pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      // If hasPortfolio, languages, or includeSubcategories filter is applied, we need to use aggregation pipeline
-      if (hasPortfolio !== undefined || (languages && languages.length > 0) || includeSubcategories) {
+      // If hasPortfolio, languages, includeSubcategories, or author rating filters are applied, we need to use aggregation pipeline
+      if (hasPortfolio !== undefined || (languages && languages.length > 0) || includeSubcategories || minAuthorRating !== undefined || maxAuthorRating !== undefined) {
         const pipeline = [];
 
         // Apply category filtering with subcategories if needed
@@ -256,10 +258,16 @@ class SearchService {
           }
         }
 
+        // Apply author rating filter if specified - need to handle this specially with aggregation
+        if (minAuthorRating !== undefined || maxAuthorRating !== undefined) {
+          // For author rating filtering, we need to join with the Profile collection
+          // This will be handled in the $lookup section below
+        }
+
         // Match phase with adjusted filters (handling categories with subcategories and tags if needed)
         pipeline.push({ $match: adjustedFilter });
 
-        // Join with Profile collection to check for portfolio items or languages
+        // Join with Profile collection to check for portfolio items, languages, or author ratings
         pipeline.push({
           $lookup: {
             from: 'profiles',
@@ -268,6 +276,18 @@ class SearchService {
             as: 'profileInfo'
           }
         });
+
+        // Also join with Profile collection by user ID (for author rating filtering)
+        if (minAuthorRating !== undefined || maxAuthorRating !== undefined) {
+          pipeline.push({
+            $lookup: {
+              from: 'profiles',
+              localField: 'ownerId',  // Advertisement.ownerId
+              foreignField: 'user',   // Profile.user field
+              as: 'ownerProfile'
+            }
+          });
+        }
 
         // Filter based on whether the profile has portfolio items
         if (hasPortfolio !== undefined) {
@@ -304,6 +324,25 @@ class SearchService {
               ]
             }
           });
+        }
+
+        // Apply author rating filter if specified
+        if (minAuthorRating !== undefined || maxAuthorRating !== undefined) {
+          const authorRatingFilter = {};
+
+          if (minAuthorRating !== undefined) {
+            authorRatingFilter['ownerProfile.rating.average'] = { $gte: parseFloat(minAuthorRating) };
+          }
+
+          if (maxAuthorRating !== undefined) {
+            if (authorRatingFilter['ownerProfile.rating.average']) {
+              authorRatingFilter['ownerProfile.rating.average'].$lte = parseFloat(maxAuthorRating);
+            } else {
+              authorRatingFilter['ownerProfile.rating.average'] = { $lte: parseFloat(maxAuthorRating) };
+            }
+          }
+
+          pipeline.push({ $match: authorRatingFilter });
         }
 
         // Sort
@@ -408,6 +447,34 @@ class SearchService {
               ]
             }
           });
+        }
+
+        // Apply author rating filter to count pipeline if needed
+        if (minAuthorRating !== undefined || maxAuthorRating !== undefined) {
+          countPipeline.push({
+            $lookup: {
+              from: 'profiles',
+              localField: 'ownerId',  // Advertisement.ownerId
+              foreignField: 'user',   // Profile.user field
+              as: 'ownerProfile'
+            }
+          });
+
+          const countAuthorRatingFilter = {};
+
+          if (minAuthorRating !== undefined) {
+            countAuthorRatingFilter['ownerProfile.rating.average'] = { $gte: parseFloat(minAuthorRating) };
+          }
+
+          if (maxAuthorRating !== undefined) {
+            if (countAuthorRatingFilter['ownerProfile.rating.average']) {
+              countAuthorRatingFilter['ownerProfile.rating.average'].$lte = parseFloat(maxAuthorRating);
+            } else {
+              countAuthorRatingFilter['ownerProfile.rating.average'] = { $lte: parseFloat(maxAuthorRating) };
+            }
+          }
+
+          countPipeline.push({ $match: countAuthorRatingFilter });
         }
 
         countPipeline.push({ $count: 'total' });

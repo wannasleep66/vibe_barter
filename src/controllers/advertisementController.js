@@ -156,6 +156,8 @@ const advertisementController = {
         expiresAfter,
         minCreatedAt,
         maxCreatedAt,
+        minAuthorRating,
+        maxAuthorRating,
         longitude,
         latitude,
         maxDistance,
@@ -222,11 +224,20 @@ const advertisementController = {
       if (ownerId) filter.ownerId = ownerId;
       if (profileId) filter.profileId = profileId;
 
-      // Rating filters
+      // Advertisement rating filters
       if (minRating !== undefined || maxRating !== undefined) {
         filter['rating.average'] = {};
         if (minRating !== undefined) filter['rating.average'].$gte = parseFloat(minRating);
         if (maxRating !== undefined) filter['rating.average'].$lte = parseFloat(maxRating);
+      }
+
+      // Author profile rating filters - these require aggregation pipeline when used
+      if (minAuthorRating !== undefined || maxAuthorRating !== undefined) {
+        // Store these as separate variables for use in aggregation pipeline
+        req.ratingFilters = {
+          minAuthorRating: minAuthorRating !== undefined ? parseFloat(minAuthorRating) : undefined,
+          maxAuthorRating: maxAuthorRating !== undefined ? parseFloat(maxAuthorRating) : undefined
+        };
       }
 
       // Views filters
@@ -534,68 +545,237 @@ const advertisementController = {
           const countResult = await Advertisement.aggregate(countPipeline);
           total = countResult.length > 0 ? countResult[0].total : 0;
         } else {
-          // Regular find without portfolio or language filters, but with subcategory support
-          let advertisementsQuery;
-          let effectiveFilter = filter;
+          // Check if we need to apply author rating filters which require aggregation pipeline
+          if (minAuthorRating !== undefined || maxAuthorRating !== undefined) {
+            // Use aggregation pipeline for author rating filtering
+            const aggPipeline = [];
 
-          // If we need to include subcategories, adjust the filter
-          if (categoryId && includeSubcategories) {
-            if (Array.isArray(categoryId)) {
-              // Multiple categories - get children for each
-              const allCategoryIds = [];
-              for (const catId of categoryId) {
-                const childIds = await getCategoryWithChildren(catId);
-                allCategoryIds.push(...childIds);
-              }
-              effectiveFilter = { ...filter, categoryId: { $in: [...new Set(allCategoryIds)] } };
-            } else {
-              // Single category - get its children
-              const categoryIds = await getCategoryWithChildren(categoryId);
-              effectiveFilter = { ...filter, categoryId: { $in: categoryIds } };
-            }
-          }
+            // Match phase with existing filters
+            aggPipeline.push({ $match: filter });
 
-          if (longitude && latitude) {
-            // Geographic search using coordinates
-            advertisementsQuery = Advertisement.find({
-              ...effectiveFilter,
-              coordinates: {
-                $geoWithin: {
-                  $centerSphere: [
-                    [parseFloat(longitude), parseFloat(latitude)],
-                    parseFloat(maxDistance || 10000) / 6378137 // Convert meters to radians
-                  ]
-                }
+            // Join with Profile collection to access profile ratings
+            aggPipeline.push({
+              $lookup: {
+                from: 'profiles',
+                localField: 'ownerId',  // Advertisement.ownerId
+                foreignField: 'user',   // Profile.user field
+                as: 'ownerProfile'
               }
             });
+
+            // Apply author rating filters
+            if (minAuthorRating !== undefined || maxAuthorRating !== undefined) {
+              const ratingFilter = {};
+
+              if (minAuthorRating !== undefined) {
+                ratingFilter['ownerProfile.rating.average'] = { $gte: parseFloat(minAuthorRating) };
+              }
+
+              if (maxAuthorRating !== undefined) {
+                if (ratingFilter['ownerProfile.rating.average']) {
+                  ratingFilter['ownerProfile.rating.average'].$lte = parseFloat(maxAuthorRating);
+                } else {
+                  ratingFilter['ownerProfile.rating.average'] = { $lte: parseFloat(maxAuthorRating) };
+                }
+              }
+
+              aggPipeline.push({ $match: ratingFilter });
+            }
+
+            // Apply geographic filtering if needed
+            if (longitude && latitude) {
+              aggPipeline.push({
+                $match: {
+                  coordinates: {
+                    $geoWithin: {
+                      $centerSphere: [
+                        [parseFloat(longitude), parseFloat(latitude)],
+                        parseFloat(maxDistance || 10000) / 6378137 // Convert meters to radians
+                      ]
+                    }
+                  }
+                }
+              });
+            }
+
+            // Calculate pagination
+            const skip = (parseInt(page) - 1) * parseInt(limit);
+
+            // Sort
+            const sortObj = {};
+            sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+            aggPipeline.push({ $sort: sortObj });
+
+            // Skip and limit for pagination
+            aggPipeline.push({ $skip: skip });
+            aggPipeline.push({ $limit: parseInt(limit) });
+
+            // Perform population using lookup
+            aggPipeline.push({
+              $lookup: {
+                from: 'users',
+                localField: 'ownerId',
+                foreignField: '_id',
+                as: 'ownerId'
+              }
+            });
+
+            aggPipeline.push({
+              $lookup: {
+                from: 'categories',
+                localField: 'categoryId',
+                foreignField: '_id',
+                as: 'categoryId'
+              }
+            });
+
+            aggPipeline.push({
+              $lookup: {
+                from: 'tags',
+                localField: 'tags',
+                foreignField: '_id',
+                as: 'tags'
+              }
+            });
+
+            aggPipeline.push({
+              $lookup: {
+                from: 'profiles',
+                localField: 'profileId',
+                foreignField: '_id',
+                as: 'profileId'
+              }
+            });
+
+            // Format the data similar to populate
+            aggPipeline.push({
+              $addFields: {
+                'ownerId': { $arrayElemAt: ['$ownerId', 0] },
+                'categoryId': { $arrayElemAt: ['$categoryId', 0] },
+                'profileId': { $arrayElemAt: ['$profileId', 0] },
+                // Flatten profile rating data
+                'ownerProfile': { $arrayElemAt: ['$ownerProfile', 0] }
+              }
+            });
+
+            advertisements = await Advertisement.aggregate(aggPipeline);
+
+            // Get total count for pagination using a separate pipeline
+            const countPipeline = [];
+            countPipeline.push({ $match: filter });
+
+            // Join with Profile collection for count as well
+            countPipeline.push({
+              $lookup: {
+                from: 'profiles',
+                localField: 'ownerId',
+                foreignField: 'user',
+                as: 'ownerProfile'
+              }
+            });
+
+            // Apply author rating filters for count
+            if (minAuthorRating !== undefined || maxAuthorRating !== undefined) {
+              const countRatingFilter = {};
+
+              if (minAuthorRating !== undefined) {
+                countRatingFilter['ownerProfile.rating.average'] = { $gte: parseFloat(minAuthorRating) };
+              }
+
+              if (maxAuthorRating !== undefined) {
+                if (countRatingFilter['ownerProfile.rating.average']) {
+                  countRatingFilter['ownerProfile.rating.average'].$lte = parseFloat(maxAuthorRating);
+                } else {
+                  countRatingFilter['ownerProfile.rating.average'] = { $lte: parseFloat(maxAuthorRating) };
+                }
+              }
+
+              countPipeline.push({ $match: countRatingFilter });
+            }
+
+            if (longitude && latitude) {
+              // Add geo filter to count pipeline too
+              countPipeline.push({
+                $match: {
+                  coordinates: {
+                    $geoWithin: {
+                      $centerSphere: [
+                        [parseFloat(longitude), parseFloat(latitude)],
+                        parseFloat(maxDistance || 10000) / 6378137 // Convert meters to radians
+                      ]
+                    }
+                  }
+                }
+              });
+            }
+
+            countPipeline.push({ $count: 'total' });
+            const countResult = await Advertisement.aggregate(countPipeline);
+            total = countResult.length > 0 ? countResult[0].total : 0;
           } else {
-            advertisementsQuery = Advertisement.find(effectiveFilter);
+            // Regular find without author rating filters, but with subcategory support
+            let advertisementsQuery;
+            let effectiveFilter = filter;
+
+            // If we need to include subcategories, adjust the filter
+            if (categoryId && includeSubcategories) {
+              if (Array.isArray(categoryId)) {
+                // Multiple categories - get children for each
+                const allCategoryIds = [];
+                for (const catId of categoryId) {
+                  const childIds = await getCategoryWithChildren(catId);
+                  allCategoryIds.push(...childIds);
+                }
+                effectiveFilter = { ...filter, categoryId: { $in: [...new Set(allCategoryIds)] } };
+              } else {
+                // Single category - get its children
+                const categoryIds = await getCategoryWithChildren(categoryId);
+                effectiveFilter = { ...filter, categoryId: { $in: categoryIds } };
+              }
+            }
+
+            if (longitude && latitude) {
+              // Geographic search using coordinates
+              advertisementsQuery = Advertisement.find({
+                ...effectiveFilter,
+                coordinates: {
+                  $geoWithin: {
+                    $centerSphere: [
+                      [parseFloat(longitude), parseFloat(latitude)],
+                      parseFloat(maxDistance || 10000) / 6378137 // Convert meters to radians
+                    ]
+                  }
+                }
+              });
+            } else {
+              advertisementsQuery = Advertisement.find(effectiveFilter);
+            }
+
+            // Calculate pagination
+            const skip = (parseInt(page) - 1) * parseInt(limit);
+
+            // Set up query with populate
+            const sortObj = {};
+            sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+            advertisementsQuery
+              .populate('ownerId', 'firstName lastName email')
+              .populate('categoryId', 'name description')
+              .populate('tags', 'name')
+              .populate('profileId', 'firstName lastName')
+              .sort(sortObj)
+              .skip(skip)
+              .limit(parseInt(limit));
+
+            advertisements = await advertisementsQuery;
+
+            // Get total count for pagination
+            // Use the same filters for count but without geo-location for efficiency
+            let totalCountFilter = effectiveFilter;
+            if (longitude && latitude) {
+              totalCountFilter = { ...effectiveFilter }; // Count total without geo filter
+            }
+            total = await Advertisement.countDocuments(totalCountFilter);
           }
-
-          // Calculate pagination
-          const skip = (parseInt(page) - 1) * parseInt(limit);
-
-          // Set up query with populate
-          const sortObj = {};
-          sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
-          advertisementsQuery
-            .populate('ownerId', 'firstName lastName email')
-            .populate('categoryId', 'name description')
-            .populate('tags', 'name')
-            .populate('profileId', 'firstName lastName')
-            .sort(sortObj)
-            .skip(skip)
-            .limit(parseInt(limit));
-
-          advertisements = await advertisementsQuery;
-
-          // Get total count for pagination
-          // Use the same filters for count but without geo-location for efficiency
-          let totalCountFilter = effectiveFilter;
-          if (longitude && latitude) {
-            totalCountFilter = { ...effectiveFilter }; // Count total without geo filter
-          }
-          total = await Advertisement.countDocuments(totalCountFilter);
         }
 
         res.status(200).json({

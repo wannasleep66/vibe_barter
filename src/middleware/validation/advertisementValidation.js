@@ -110,7 +110,9 @@ const getAdvertisementsQuerySchema = Joi.object({
   ownerId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(), // For admin search
   profileId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
   minRating: Joi.number().min(0).max(5).optional(), // Minimum average rating
-  maxRating: Joi.number().min(0).max(5).optional(), // Maximum average rating
+  maxRating: Joi.number().min(0).max(5).optional(), // Maximum average rating (for advertisement)
+  minAuthorRating: Joi.number().min(0).max(5).optional(), // Minimum author rating
+  maxAuthorRating: Joi.number().min(0).max(5).optional(), // Maximum author rating
   minViews: Joi.number().integer().min(0).optional(), // Minimum number of views
   maxViews: Joi.number().integer().min(0).optional(), // Maximum number of views
   minApplications: Joi.number().integer().min(0).optional(), // Minimum number of applications
