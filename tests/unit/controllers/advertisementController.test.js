@@ -559,4 +559,118 @@ describe('AdvertisementController Unit Tests', () => {
       expect(next).toHaveBeenCalledWith(error);
     });
   });
+
+  describe('activateAdvertisement', () => {
+    it('should activate advertisement successfully', async () => {
+      const mockUser = { _id: 'userId123' };
+      const mockAdvertisement = {
+        _id: 'ad123',
+        title: 'Test Ad',
+        ownerId: 'userId123',
+        isArchived: true,
+        archivedAt: new Date(),
+        isActive: false,
+        save: jest.fn()
+      };
+
+      req.user = mockUser;
+      req.params = { id: 'ad123' };
+
+      Advertisement.findById.mockResolvedValue(mockAdvertisement);
+
+      await advertisementController.activateAdvertisement(req, res, next);
+
+      expect(mockAdvertisement.isArchived).toBe(false);
+      expect(mockAdvertisement.archivedAt).toBeUndefined();
+      expect(mockAdvertisement.isActive).toBe(true);
+      expect(mockAdvertisement.save).toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockAdvertisement,
+        message: 'Advertisement activated successfully'
+      });
+    });
+
+    it('should return 403 if user does not own the advertisement', async () => {
+      const mockUser = { _id: 'differentUserId' };
+      const mockAdvertisement = {
+        _id: 'ad123',
+        title: 'Test Ad',
+        ownerId: 'userId123',
+        isArchived: true
+      };
+
+      req.user = mockUser;
+      req.params = { id: 'ad123' };
+
+      Advertisement.findById.mockResolvedValue(mockAdvertisement);
+
+      await advertisementController.activateAdvertisement(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'You do not have permission to activate this advertisement',
+          statusCode: 403
+        })
+      );
+    });
+
+    it('should return 404 if advertisement not found', async () => {
+      req.params = { id: 'nonExistentId' };
+
+      Advertisement.findById.mockResolvedValue(null);
+
+      await advertisementController.activateAdvertisement(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Advertisement not found',
+          statusCode: 404
+        })
+      );
+    });
+
+    it('should return 400 if advertisement is not archived', async () => {
+      const mockUser = { _id: 'userId123' };
+      const mockAdvertisement = {
+        _id: 'ad123',
+        title: 'Test Ad',
+        ownerId: 'userId123',
+        isArchived: false // Not archived
+      };
+
+      req.user = mockUser;
+      req.params = { id: 'ad123' };
+
+      Advertisement.findById.mockResolvedValue(mockAdvertisement);
+
+      await advertisementController.activateAdvertisement(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Advertisement is not archived',
+          statusCode: 400
+        })
+      );
+    });
+
+    it('should handle invalid ID format', async () => {
+      const error = new Error();
+      error.name = 'CastError';
+
+      req.params = { id: 'invalidId' };
+
+      Advertisement.findById.mockRejectedValue(error);
+
+      await advertisementController.activateAdvertisement(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Invalid advertisement ID format',
+          statusCode: 400
+        })
+      );
+    });
+  });
 });

@@ -122,11 +122,19 @@ const advertisementController = {
 
       // Build filter object
       const filter = { isActive: true }; // Only active by default
-      
+
       if (isActive !== 'any') {
         filter.isActive = isActive === 'true';
       }
-      
+
+      // Allow filtering by archived status as well
+      if (isArchived !== undefined && req.user) {
+        // Only allow users to see archived ads if they are the owner or an admin/moderator
+        if (req.user.role === 'admin' || req.user.role === 'moderator') {
+          filter.isArchived = isArchived === 'true';
+        }
+      }
+
       if (categoryId) filter.categoryId = categoryId;
       if (tagId) filter.tags = { $in: [tagId] };
       if (type) filter.type = type;
@@ -376,8 +384,8 @@ const advertisementController = {
       } = req.query;
 
       // Build filter object for user's advertisements
-      const filter = { 
-        ownerId: req.user._id 
+      const filter = {
+        ownerId: req.user._id
       };
 
       if (isActive !== undefined) {
@@ -426,6 +434,51 @@ const advertisementController = {
       });
     } catch (error) {
       logger.error('Error getting user advertisements:', error.message);
+      next(error);
+    }
+  },
+
+  // Activate an archived advertisement
+  activateAdvertisement: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+
+      const advertisement = await Advertisement.findById(id);
+      if (!advertisement) {
+        return next(new AppError('Advertisement not found', 404));
+      }
+
+      // Check if user owns the advertisement
+      if (advertisement.ownerId.toString() !== req.user._id.toString()) {
+        return next(new AppError('You do not have permission to activate this advertisement', 403));
+      }
+
+      if (!advertisement.isArchived) {
+        return next(new AppError('Advertisement is not archived', 400));
+      }
+
+      // Activate the advertisement
+      advertisement.isArchived = false;
+      advertisement.archivedAt = undefined;
+      advertisement.isActive = true;
+
+      // If the expiresAt date was in the past, set a new default expiration (e.g., 30 days from now)
+      if (advertisement.expiresAt && advertisement.expiresAt < new Date()) {
+        advertisement.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+      }
+
+      await advertisement.save();
+
+      res.status(200).json({
+        success: true,
+        data: advertisement,
+        message: 'Advertisement activated successfully'
+      });
+    } catch (error) {
+      if (error.name === 'CastError') {
+        return next(new AppError('Invalid advertisement ID format', 400));
+      }
+      logger.error('Error activating advertisement:', error.message);
       next(error);
     }
   }

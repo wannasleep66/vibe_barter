@@ -55,6 +55,13 @@ router.patch('/:id/archive',
   advertisementController.archiveAdvertisement
 );
 
+// Activate advertisement - user can activate their own archived advertisement
+router.patch('/:id/activate',
+  validateAdvertisementId,
+  isOwnResourceOrAdmin('ownerId'), // Check if user owns the advertisement or is admin
+  advertisementController.activateAdvertisement
+);
+
 // Get user's own advertisements - requires advertisement.read permission
 router.get('/my-advertisements',
   requirePermissions('advertisement.read'),
