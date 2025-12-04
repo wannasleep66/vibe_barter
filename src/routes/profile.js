@@ -62,4 +62,8 @@ router.get('/portfolio', ProfileController.getPortfolio);
 router.put('/portfolio', require('../middleware/profileValidation').validateUpdatePortfolioItem, ProfileController.updatePortfolioItem);
 router.delete('/portfolio/:title', ProfileController.removePortfolioItem);
 
+// Preferences routes - all protected
+router.get('/preferences', ProfileController.getPreferences);
+router.put('/preferences', require('../middleware/profileValidation').validateUpdatePreferences, ProfileController.updatePreferences);
+
 module.exports = router;

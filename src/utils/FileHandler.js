@@ -62,21 +62,21 @@ class FileHandler {
       const ext = path.extname(file.originalname).toLowerCase();
       const allowedExtensions = allowedMimes.map(mime => {
         switch (mime) {
-          case 'image/jpeg':
-          case 'image/jpg':
-            return ['.jpg', '.jpeg'];
-          case 'image/png':
-            return ['.png'];
-          case 'image/gif':
-            return ['.gif'];
-          case 'application/pdf':
-            return ['.pdf'];
-          case 'application/msword':
-            return ['.doc'];
-          case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-            return ['.docx'];
-          default:
-            return [];
+        case 'image/jpeg':
+        case 'image/jpg':
+          return ['.jpg', '.jpeg'];
+        case 'image/png':
+          return ['.png'];
+        case 'image/gif':
+          return ['.gif'];
+        case 'application/pdf':
+          return ['.pdf'];
+        case 'application/msword':
+          return ['.doc'];
+        case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+          return ['.docx'];
+        default:
+          return [];
         }
       }).flat();
 
@@ -266,15 +266,15 @@ class FileHandler {
       const ext = path.extname(file.originalname).toLowerCase();
       const allowedExtensions = allowedMimes.map(mime => {
         switch (mime) {
-          case 'image/jpeg':
-          case 'image/jpg':
-            return ['.jpg', '.jpeg'];
-          case 'image/png':
-            return ['.png'];
-          case 'image/gif':
-            return ['.gif'];
-          default:
-            return [];
+        case 'image/jpeg':
+        case 'image/jpg':
+          return ['.jpg', '.jpeg'];
+        case 'image/png':
+          return ['.png'];
+        case 'image/gif':
+          return ['.gif'];
+        default:
+          return [];
         }
       }).flat();
 

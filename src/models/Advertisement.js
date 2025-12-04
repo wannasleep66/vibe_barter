@@ -101,6 +101,39 @@ const advertisementSchema = new mongoose.Schema({
   },
   searchVector: {
     type: String // For full-text search optimization - stores tag names, location, etc.
+  },
+  isHidden: {
+    type: Boolean,
+    default: false // For moderation purposes
+  },
+  hideReason: {
+    type: String // Reason why ad was hidden
+  },
+  hiddenAt: {
+    type: Date // When the ad was hidden
+  },
+  hiddenBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User' // Moderator who hid the ad
+  },
+  reportedCount: {
+    type: Number,
+    default: 0 // Number of times the ad has been reported
+  },
+  isModerated: {
+    type: Boolean,
+    default: false // Whether the ad has gone through moderation
+  },
+  moderationNotes: {
+    type: String,
+    maxlength: [500, 'Moderation notes cannot exceed 500 characters']
+  },
+  lastModeratedAt: {
+    type: Date
+  },
+  lastModeratedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User' // Last moderator who reviewed the ad
   }
 }, {
   timestamps: true
@@ -149,5 +182,27 @@ advertisementSchema.index({ views: 1 }); // For views filtering
 advertisementSchema.index({ applicationCount: 1 }); // For application count filtering
 advertisementSchema.index({ expiresAt: 1 }); // For expiration date filtering
 advertisementSchema.index({ createdAt: 1 }); // For creation date range filtering
+
+// Indexes for recommendation optimization
+advertisementSchema.index({
+  categoryId: 1,
+  type: 1,
+  tags: 1,
+  location: 1,
+  'rating.average': 1
+}); // Compound index for efficient recommendation queries
+
+// Indexes for moderation
+advertisementSchema.index({ isHidden: 1 }); // For filtering hidden ads
+advertisementSchema.index({ hideReason: 1 }); // For searching by hide reason
+advertisementSchema.index({ hiddenAt: -1 }); // For sorting by when hidden
+advertisementSchema.index({ hiddenBy: 1 }); // For finding ads hidden by specific moderator
+advertisementSchema.index({ reportedCount: 1 }); // For identifying frequently reported ads
+advertisementSchema.index({ isModerated: 1 }); // For finding moderated ads
+advertisementSchema.index({ lastModeratedAt: -1 }); // For sorting by moderation date
+advertisementSchema.index({ lastModeratedBy: 1 }); // For finding ads moderated by specific moderator
+
+// Index for ads that are hidden but may need review
+advertisementSchema.index({ isHidden: 1, isActive: 1 }); // For finding hidden active ads
 
 module.exports = mongoose.model('Advertisement', advertisementSchema);

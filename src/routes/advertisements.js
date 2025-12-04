@@ -69,4 +69,22 @@ router.get('/my-advertisements',
   advertisementController.getUserAdvertisements
 );
 
+// Get recommended advertisements based on user preferences
+router.get('/recommended',
+  requirePermissions('advertisement.read'),
+  advertisementController.getRecommendedAdvertisements
+);
+
+// Get rating information for an advertisement
+router.get('/:id/rating',
+  validateAdvertisementId,
+  advertisementController.getAdvertisementRating
+);
+
+// Report an advertisement as inappropriate
+router.post('/:id/report',
+  validateAdvertisementId,
+  advertisementController.reportAdvertisement
+);
+
 module.exports = router;
