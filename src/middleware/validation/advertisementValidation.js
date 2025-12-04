@@ -93,7 +93,11 @@ const getAdvertisementsQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).optional().default(10),
   search: Joi.string().max(100).optional().allow(''),
   type: Joi.string().valid('service', 'goods', 'skill', 'experience').optional(),
-  categoryId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
+  categoryId: Joi.alternatives().try(
+    Joi.string().pattern(/^[0-9a-fA-F]{24}$/), // Single category ID
+    Joi.array().items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/)) // Multiple category IDs
+  ).optional(),
+  includeSubcategories: Joi.boolean().optional().default(false), // Include subcategories in results
   tagId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
   location: Joi.string().max(100).optional().allow(''),
   isUrgent: Joi.boolean().optional(),

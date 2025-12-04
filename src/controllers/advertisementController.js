@@ -8,6 +8,29 @@ const SearchService = require('../services/SearchService');
 const { logger } = require('../logger/logger');
 const AppError = require('../utils/AppError');
 
+// Helper function to get all subcategories for a given category
+async function getCategoryWithChildren(categoryId) {
+  const CategoryModel = require('../models/Category');
+  const categoriesToInclude = [categoryId];
+
+  // Recursively find all child categories
+  const findChildCategories = async (parentIds) => {
+    const children = await CategoryModel.find({ parentId: { $in: parentIds } });
+    if (children.length === 0) return; // No more children
+
+    const childIds = children.map(child => child._id.toString());
+    categoriesToInclude.push(...childIds);
+
+    // Recursively find children of these children
+    await findChildCategories(childIds);
+  };
+
+  // Start with the specified category
+  await findChildCategories([categoryId]);
+
+  return categoriesToInclude;
+}
+
 const advertisementController = {
   // Create new advertisement
   createAdvertisement: async (req, res, next) => {
@@ -157,7 +180,24 @@ const advertisementController = {
         }
       }
 
-      if (categoryId) filter.categoryId = categoryId;
+      // Handle category filtering (single category ID, multiple category IDs, with or without subcategories)
+      if (categoryId) {
+        if (Array.isArray(categoryId)) {
+          // Multiple categories - match any of the specified categories
+          filter.categoryId = { $in: categoryId };
+        } else {
+          // Single category - could include subcategories if requested
+          if (includeSubcategories) {
+            // Include both the specified category and its subcategories
+            const Category = require('../models/Category');
+            const categoryIds = await getCategoryWithChildren(categoryId);
+            filter.categoryId = { $in: categoryIds };
+          } else {
+            // Just the specified category
+            filter.categoryId = categoryId;
+          }
+        }
+      }
       if (tagId) filter.tags = { $in: [tagId] };
       if (type) filter.type = type;
       if (location) filter.location = { $regex: location, $options: 'i' };
@@ -479,12 +519,31 @@ const advertisementController = {
           const countResult = await Advertisement.aggregate(countPipeline);
           total = countResult.length > 0 ? countResult[0].total : 0;
         } else {
-          // Regular find without portfolio or language filters
+          // Regular find without portfolio or language filters, but with subcategory support
           let advertisementsQuery;
+          let effectiveFilter = filter;
+
+          // If we need to include subcategories, adjust the filter
+          if (categoryId && includeSubcategories) {
+            if (Array.isArray(categoryId)) {
+              // Multiple categories - get children for each
+              const allCategoryIds = [];
+              for (const catId of categoryId) {
+                const childIds = await getCategoryWithChildren(catId);
+                allCategoryIds.push(...childIds);
+              }
+              effectiveFilter = { ...filter, categoryId: { $in: [...new Set(allCategoryIds)] } };
+            } else {
+              // Single category - get its children
+              const categoryIds = await getCategoryWithChildren(categoryId);
+              effectiveFilter = { ...filter, categoryId: { $in: categoryIds } };
+            }
+          }
+
           if (longitude && latitude) {
             // Geographic search using coordinates
             advertisementsQuery = Advertisement.find({
-              ...filter,
+              ...effectiveFilter,
               coordinates: {
                 $geoWithin: {
                   $centerSphere: [
@@ -495,7 +554,7 @@ const advertisementController = {
               }
             });
           } else {
-            advertisementsQuery = Advertisement.find(filter);
+            advertisementsQuery = Advertisement.find(effectiveFilter);
           }
 
           // Calculate pagination
@@ -517,9 +576,9 @@ const advertisementController = {
 
           // Get total count for pagination
           // Use the same filters for count but without geo-location for efficiency
-          let totalCountFilter = filter;
+          let totalCountFilter = effectiveFilter;
           if (longitude && latitude) {
-            totalCountFilter = { ...filter }; // Count total without geo filter
+            totalCountFilter = { ...effectiveFilter }; // Count total without geo filter
           }
           total = await Advertisement.countDocuments(totalCountFilter);
         }

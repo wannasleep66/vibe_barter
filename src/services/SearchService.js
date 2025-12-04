@@ -3,6 +3,29 @@ const Advertisement = require('../models/Advertisement');
 const Tag = require('../models/Tag');
 const { logger } = require('../logger/logger');
 
+// Helper function to get all subcategories for a given category
+async function getCategoryWithChildren(categoryId) {
+  const Category = require('../models/Category');
+  const categoriesToInclude = [categoryId];
+
+  // Recursively find all child categories
+  const findChildCategories = async (parentIds) => {
+    const children = await Category.find({ parentId: { $in: parentIds } });
+    if (children.length === 0) return; // No more children
+
+    const childIds = children.map(child => child._id.toString());
+    categoriesToInclude.push(...childIds);
+
+    // Recursively find children of these children
+    await findChildCategories(childIds);
+  };
+
+  // Start with the specified category
+  await findChildCategories([categoryId]);
+
+  return categoriesToInclude;
+}
+
 class SearchService {
   /**
    * Update the search vector for an advertisement based on associated tags and other text fields
@@ -73,6 +96,7 @@ class SearchService {
         maxCreatedAt,
         hasPortfolio,
         languages, // Added languages parameter
+        includeSubcategories = false, // Include subcategories in search
         sortBy = 'createdAt',
         sortOrder = 'desc'
       } = options;
@@ -99,6 +123,25 @@ class SearchService {
       if (isUrgent) filter.isUrgent = isUrgent === 'true';
       if (ownerId) filter.ownerId = ownerId;
       if (profileId) filter.profileId = profileId;
+
+      // Handle category filtering (with or without subcategories)
+      if (categoryId) {
+        if (Array.isArray(categoryId)) {
+          // Multiple categories - match any of the specified categories
+          filter.categoryId = { $in: categoryId };
+        } else {
+          // Single category - could include subcategories if requested
+          if (includeSubcategories) {
+            // Include both the specified category and its subcategories
+            const Category = require('../models/Category');
+            const categoryIds = await getCategoryWithChildren(categoryId);
+            filter.categoryId = { $in: categoryIds };
+          } else {
+            // Just the specified category
+            filter.categoryId = categoryId;
+          }
+        }
+      }
 
       // Apply additional filters
       // Rating filters
@@ -158,12 +201,30 @@ class SearchService {
       // Calculate pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      // If hasPortfolio or languages filter is applied, we need to use aggregation pipeline
-      if (hasPortfolio !== undefined || (languages && languages.length > 0)) {
+      // If hasPortfolio, languages, or includeSubcategories filter is applied, we need to use aggregation pipeline
+      if (hasPortfolio !== undefined || (languages && languages.length > 0) || includeSubcategories) {
         const pipeline = [];
 
-        // Match phase with existing filters
-        pipeline.push({ $match: filter });
+        // Apply category filtering with subcategories if needed
+        const adjustedFilter = { ...filter };
+        if (categoryId && includeSubcategories) {
+          if (Array.isArray(categoryId)) {
+            // Multiple categories - get children for each
+            const allCategoryIds = [];
+            for (const catId of categoryId) {
+              const childIds = await getCategoryWithChildren(catId);
+              allCategoryIds.push(...childIds);
+            }
+            adjustedFilter.categoryId = { $in: [...new Set(allCategoryIds)] }; // Use Set to deduplicate
+          } else {
+            // Single category - get its children
+            const categoryIds = await getCategoryWithChildren(categoryId);
+            adjustedFilter.categoryId = { $in: categoryIds };
+          }
+        }
+
+        // Match phase with adjusted filters (handling categories with subcategories if needed)
+        pipeline.push({ $match: adjustedFilter });
 
         // Join with Profile collection to check for portfolio items or languages
         pipeline.push({
@@ -269,7 +330,8 @@ class SearchService {
 
         // For total count, we need a separate pipeline
         const countPipeline = [];
-        countPipeline.push({ $match: filter });
+        // Use the same adjusted filter for count
+        countPipeline.push({ $match: adjustedFilter });
 
         // Join with Profile collection for count as well
         countPipeline.push({
@@ -331,9 +393,28 @@ class SearchService {
           }
         };
       } else {
-        // Use regular find without hasPortfolio filter
+        // Use regular find without hasPortfolio or languages filter
         // Get advertisements with filtering and sorting
-        const advertisements = await Advertisement.find(filter)
+
+        // If we need to include subcategories, adjust the filter
+        let effectiveFilter = filter;
+        if (categoryId && includeSubcategories) {
+          if (Array.isArray(categoryId)) {
+            // Multiple categories - get children for each
+            const allCategoryIds = [];
+            for (const catId of categoryId) {
+              const childIds = await getCategoryWithChildren(catId);
+              allCategoryIds.push(...childIds);
+            }
+            effectiveFilter = { ...filter, categoryId: { $in: [...new Set(allCategoryIds)] } };
+          } else {
+            // Single category - get its children
+            const categoryIds = await getCategoryWithChildren(categoryId);
+            effectiveFilter = { ...filter, categoryId: { $in: categoryIds } };
+          }
+        }
+
+        const advertisements = await Advertisement.find(effectiveFilter)
           .populate('ownerId', 'firstName lastName email')
           .populate('categoryId', 'name description')
           .populate('tags', 'name')
@@ -343,7 +424,7 @@ class SearchService {
           .limit(parseInt(limit));
 
         // Get total count for pagination
-        const total = await Advertisement.countDocuments(filter);
+        const total = await Advertisement.countDocuments(effectiveFilter);
 
         return {
           advertisements,
