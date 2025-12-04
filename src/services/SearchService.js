@@ -72,6 +72,7 @@ class SearchService {
         minCreatedAt,
         maxCreatedAt,
         hasPortfolio,
+        languages, // Added languages parameter
         sortBy = 'createdAt',
         sortOrder = 'desc'
       } = options;
@@ -157,14 +158,14 @@ class SearchService {
       // Calculate pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      // If hasPortfolio filter is applied, we need to use aggregation pipeline
-      if (hasPortfolio !== undefined) {
+      // If hasPortfolio or languages filter is applied, we need to use aggregation pipeline
+      if (hasPortfolio !== undefined || (languages && languages.length > 0)) {
         const pipeline = [];
 
         // Match phase with existing filters
         pipeline.push({ $match: filter });
 
-        // Join with Profile collection to check for portfolio items
+        // Join with Profile collection to check for portfolio items or languages
         pipeline.push({
           $lookup: {
             from: 'profiles',
@@ -175,26 +176,41 @@ class SearchService {
         });
 
         // Filter based on whether the profile has portfolio items
-        if (hasPortfolio === 'true') {
+        if (hasPortfolio !== undefined) {
+          if (hasPortfolio === 'true') {
+            pipeline.push({
+              $match: {
+                $or: [
+                  { 'profileInfo.portfolio.0': { $exists: true } }  // Check if first element exists
+                ]
+              }
+            });
+          } else if (hasPortfolio === 'false') {
+            pipeline.push({
+              $match: {
+                $or: [
+                  { 'profileInfo.portfolio': { $exists: true, $size: 0 } },  // Empty array
+                  { 'profileInfo.portfolio': { $exists: false } },           // Field doesn't exist
+                  { 'profileInfo': { $size: 0 } }                            // No profile found
+                ]
+              }
+            });
+          }
+          // If hasPortfolio === 'any', we don't add an extra match condition
+        }
+
+        // Apply languages filter if specified
+        if (languages && languages.length > 0) {
           pipeline.push({
             $match: {
               $or: [
-                { 'profileInfo.portfolio.0': { $exists: true } }  // Check if first element exists
-              ]
-            }
-          });
-        } else if (hasPortfolio === 'false') {
-          pipeline.push({
-            $match: {
-              $or: [
-                { 'profileInfo.portfolio': { $exists: true, $size: 0 } },  // Empty array
-                { 'profileInfo.portfolio': { $exists: false } },           // Field doesn't exist
-                { 'profileInfo': { $size: 0 } }                            // No profile found
+                { 'profileInfo.languages.language': {
+                  $in: languages.map(lang => new RegExp(lang, 'i')) // Case insensitive match
+                }}
               ]
             }
           });
         }
-        // If hasPortfolio === 'any', we don't add an extra match condition
 
         // Sort
         pipeline.push({ $sort: sort });
@@ -255,15 +271,18 @@ class SearchService {
         const countPipeline = [];
         countPipeline.push({ $match: filter });
 
+        // Join with Profile collection for count as well
+        countPipeline.push({
+          $lookup: {
+            from: 'profiles',
+            localField: 'profileId',
+            foreignField: '_id',
+            as: 'profileInfo'
+          }
+        });
+
+        // Apply hasPortfolio filter to count pipeline if needed
         if (hasPortfolio === 'true') {
-          countPipeline.push({
-            $lookup: {
-              from: 'profiles',
-              localField: 'profileId',
-              foreignField: '_id',
-              as: 'profileInfo'
-            }
-          });
           countPipeline.push({
             $match: {
               $or: [
@@ -273,19 +292,24 @@ class SearchService {
           });
         } else if (hasPortfolio === 'false') {
           countPipeline.push({
-            $lookup: {
-              from: 'profiles',
-              localField: 'profileId',
-              foreignField: '_id',
-              as: 'profileInfo'
-            }
-          });
-          countPipeline.push({
             $match: {
               $or: [
                 { 'profileInfo.portfolio': { $exists: true, $size: 0 } },
                 { 'profileInfo.portfolio': { $exists: false } },
                 { 'profileInfo': { $size: 0 } }
+              ]
+            }
+          });
+        }
+
+        // Apply languages filter to count pipeline if needed
+        if (languages && languages.length > 0) {
+          countPipeline.push({
+            $match: {
+              $or: [
+                { 'profileInfo.languages.language': {
+                  $in: languages.map(lang => new RegExp(lang, 'i')) // Case insensitive match
+                }}
               ]
             }
           });

@@ -207,6 +207,11 @@ const advertisementController = {
         // This will be handled in the query builder section below
       }
 
+      // Language filter - need to handle this specially since it requires joining with Profile
+      if (languages && languages.length > 0) {
+        // This will be handled in the query builder section below
+      }
+
       // Use enhanced search if search query is provided
       if (search) {
         const result = await SearchService.searchAdvertisements(search, {
@@ -232,6 +237,7 @@ const advertisementController = {
           minCreatedAt,
           maxCreatedAt,
           hasPortfolio, // Add the hasPortfolio filter
+          languages, // Add the languages filter
           longitude,
           latitude,
           maxDistance,
@@ -274,48 +280,249 @@ const advertisementController = {
         });
       } else {
         // For non-search queries, build the standard filter with geo-location if provided
-        let advertisementsQuery;
-        if (longitude && latitude) {
-          // Geographic search using coordinates
-          advertisementsQuery = Advertisement.find({
-            ...filter,
-            coordinates: {
-              $geoWithin: {
-                $centerSphere: [
-                  [parseFloat(longitude), parseFloat(latitude)],
-                  parseFloat(maxDistance || 10000) / 6378137 // Convert meters to radians
-                ]
-              }
+        let advertisements;
+        let total;
+
+        if (hasPortfolio !== undefined || (languages && languages.length > 0)) {
+          // Use aggregation pipeline for hasPortfolio or languages filter
+          const pipeline = [];
+
+          // Match phase with existing filters
+          pipeline.push({ $match: filter });
+
+          // Join with Profile collection to check for portfolio items or languages
+          pipeline.push({
+            $lookup: {
+              from: 'profiles',
+              localField: 'profileId',
+              foreignField: '_id',
+              as: 'profileInfo'
             }
           });
+
+          // Handle portfolio filter if specified
+          if (hasPortfolio !== undefined) {
+            if (hasPortfolio === 'true') {
+              pipeline.push({
+                $match: {
+                  $or: [
+                    { 'profileInfo.portfolio.0': { $exists: true } }  // Check if first element exists
+                  ]
+                }
+              });
+            } else if (hasPortfolio === 'false') {
+              pipeline.push({
+                $match: {
+                  $or: [
+                    { 'profileInfo.portfolio': { $exists: true, $size: 0 } },  // Empty array
+                    { 'profileInfo.portfolio': { $exists: false } },           // Field doesn't exist
+                    { 'profileInfo': { $size: 0 } }                            // No profile found
+                  ]
+                }
+              });
+            }
+            // If hasPortfolio === 'any', we don't add an extra match condition
+          }
+
+          // Handle languages filter if specified
+          if (languages && languages.length > 0) {
+            // Match advertisements whose profile has any of the specified languages
+            pipeline.push({
+              $match: {
+                $or: [
+                  { 'profileInfo.languages.language': {
+                    $in: languages.map(lang => new RegExp(lang, 'i')) // Case insensitive match
+                  }}
+                ]
+              }
+            });
+          }
+
+          // Add geographic filtering if applicable
+          if (longitude && latitude) {
+            pipeline.push({
+              $match: {
+                coordinates: {
+                  $geoWithin: {
+                    $centerSphere: [
+                      [parseFloat(longitude), parseFloat(latitude)],
+                      parseFloat(maxDistance || 10000) / 6378137 // Convert meters to radians
+                    ]
+                  }
+                }
+              }
+            });
+          }
+
+          // Sort
+          const sortObj = {};
+          sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+          pipeline.push({ $sort: sortObj });
+
+          // Skip and limit for pagination
+          pipeline.push({ $skip: (parseInt(page) - 1) * parseInt(limit) });
+          pipeline.push({ $limit: parseInt(limit) });
+
+          // Perform population using lookup
+          pipeline.push({
+            $lookup: {
+              from: 'users',
+              localField: 'ownerId',
+              foreignField: '_id',
+              as: 'ownerId'
+            }
+          });
+
+          pipeline.push({
+            $lookup: {
+              from: 'categories',
+              localField: 'categoryId',
+              foreignField: '_id',
+              as: 'categoryId'
+            }
+          });
+
+          pipeline.push({
+            $lookup: {
+              from: 'tags',
+              localField: 'tags',
+              foreignField: '_id',
+              as: 'tags'
+            }
+          });
+
+          pipeline.push({
+            $lookup: {
+              from: 'profiles',
+              localField: 'profileId',
+              foreignField: '_id',
+              as: 'profileId'
+            }
+          });
+
+          // Format the data similar to populate
+          pipeline.push({
+            $addFields: {
+              'ownerId': { $arrayElemAt: ['$ownerId', 0] },
+              'categoryId': { $arrayElemAt: ['$categoryId', 0] },
+              'profileId': { $arrayElemAt: ['$profileId', 0] }
+            }
+          });
+
+          advertisements = await Advertisement.aggregate(pipeline);
+
+          // For total count, we need a separate pipeline
+          const countPipeline = [];
+          countPipeline.push({ $match: filter });
+
+          // Join profiles for count pipeline as well
+          countPipeline.push({
+            $lookup: {
+              from: 'profiles',
+              localField: 'profileId',
+              foreignField: '_id',
+              as: 'profileInfo'
+            }
+          });
+
+          // Apply portfolio filter to count pipeline if needed
+          if (hasPortfolio === 'true') {
+            countPipeline.push({
+              $match: {
+                $or: [
+                  { 'profileInfo.portfolio.0': { $exists: true } }
+                ]
+              }
+            });
+          } else if (hasPortfolio === 'false') {
+            countPipeline.push({
+              $match: {
+                $or: [
+                  { 'profileInfo.portfolio': { $exists: true, $size: 0 } },
+                  { 'profileInfo.portfolio': { $exists: false } },
+                  { 'profileInfo': { $size: 0 } }
+                ]
+              }
+            });
+          }
+
+          // Apply languages filter to count pipeline if needed
+          if (languages && languages.length > 0) {
+            countPipeline.push({
+              $match: {
+                $or: [
+                  { 'profileInfo.languages.language': {
+                    $in: languages.map(lang => new RegExp(lang, 'i')) // Case insensitive match
+                  }}
+                ]
+              }
+            });
+          }
+
+          if (longitude && latitude) {
+            // Add geo filter to count pipeline too
+            countPipeline.push({
+              $match: {
+                coordinates: {
+                  $geoWithin: {
+                    $centerSphere: [
+                      [parseFloat(longitude), parseFloat(latitude)],
+                      parseFloat(maxDistance || 10000) / 6378137 // Convert meters to radians
+                    ]
+                  }
+                }
+              }
+            });
+          }
+
+          countPipeline.push({ $count: 'total' });
+          const countResult = await Advertisement.aggregate(countPipeline);
+          total = countResult.length > 0 ? countResult[0].total : 0;
         } else {
-          advertisementsQuery = Advertisement.find(filter);
+          // Regular find without portfolio or language filters
+          let advertisementsQuery;
+          if (longitude && latitude) {
+            // Geographic search using coordinates
+            advertisementsQuery = Advertisement.find({
+              ...filter,
+              coordinates: {
+                $geoWithin: {
+                  $centerSphere: [
+                    [parseFloat(longitude), parseFloat(latitude)],
+                    parseFloat(maxDistance || 10000) / 6378137 // Convert meters to radians
+                  ]
+                }
+              }
+            });
+          } else {
+            advertisementsQuery = Advertisement.find(filter);
+          }
+
+          // Calculate pagination
+          const skip = (parseInt(page) - 1) * parseInt(limit);
+
+          // Set up query with populate
+          const sortObj = {};
+          sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+          advertisementsQuery
+            .populate('ownerId', 'firstName lastName email')
+            .populate('categoryId', 'name description')
+            .populate('tags', 'name')
+            .populate('profileId', 'firstName lastName')
+            .sort(sortObj)
+            .skip(skip)
+            .limit(parseInt(limit));
+
+          advertisements = await advertisementsQuery;
+
+          // Get total count for pagination
+          // Use the same filters for count but without geo-location for efficiency
+          let totalCountFilter = filter;
+          if (longitude && latitude) {
+            totalCountFilter = { ...filter }; // Count total without geo filter
+          }
+          total = await Advertisement.countDocuments(totalCountFilter);
         }
-
-        // Calculate pagination
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-
-        // Set up query with populate
-        const sortObj = {};
-        sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
-        advertisementsQuery
-          .populate('ownerId', 'firstName lastName email')
-          .populate('categoryId', 'name description')
-          .populate('tags', 'name')
-          .populate('profileId', 'firstName lastName')
-          .sort(sortObj)
-          .skip(skip)
-          .limit(parseInt(limit));
-
-        const advertisements = await advertisementsQuery;
-
-        // Get total count for pagination
-        // Use the same filters for count but without geo-location for efficiency
-        let totalCountFilter = filter;
-        if (longitude && latitude) {
-          totalCountFilter = { ...filter }; // Count total without geo filter
-        }
-        const total = await Advertisement.countDocuments(totalCountFilter);
 
         res.status(200).json({
           success: true,
@@ -350,6 +557,7 @@ const advertisementController = {
             minCreatedAt,
             maxCreatedAt,
             hasPortfolio,
+            languages, // Include languages in filters
             longitude,
             latitude,
             maxDistance,
