@@ -71,6 +71,7 @@ class SearchService {
         expiresAfter,
         minCreatedAt,
         maxCreatedAt,
+        hasPortfolio,
         sortBy = 'createdAt',
         sortOrder = 'desc'
       } = options;
@@ -134,6 +135,7 @@ class SearchService {
         if (maxCreatedAt) filter.createdAt.$lte = new Date(maxCreatedAt);
       }
 
+      // Portfolio filter - handled separately in the actual query due to complexity
       // Enhanced search that looks in multiple fields
       if (query) {
         const searchRegex = new RegExp(query, 'i');
@@ -155,30 +157,182 @@ class SearchService {
       // Calculate pagination
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      // Get advertisements with filtering and sorting
-      const advertisements = await Advertisement.find(filter)
-        .populate('ownerId', 'firstName lastName email')
-        .populate('categoryId', 'name description')
-        .populate('tags', 'name')
-        .populate('profileId', 'firstName lastName')
-        .sort(sort)
-        .skip(skip)
-        .limit(parseInt(limit));
+      // If hasPortfolio filter is applied, we need to use aggregation pipeline
+      if (hasPortfolio !== undefined) {
+        const pipeline = [];
 
-      // Get total count for pagination
-      const total = await Advertisement.countDocuments(filter);
+        // Match phase with existing filters
+        pipeline.push({ $match: filter });
 
-      return {
-        advertisements,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          pages: Math.ceil(total / parseInt(limit)),
-          hasNext: parseInt(page) * parseInt(limit) < total,
-          hasPrev: parseInt(page) > 1
+        // Join with Profile collection to check for portfolio items
+        pipeline.push({
+          $lookup: {
+            from: 'profiles',
+            localField: 'profileId',
+            foreignField: '_id',
+            as: 'profileInfo'
+          }
+        });
+
+        // Filter based on whether the profile has portfolio items
+        if (hasPortfolio === 'true') {
+          pipeline.push({
+            $match: {
+              $or: [
+                { 'profileInfo.portfolio.0': { $exists: true } }  // Check if first element exists
+              ]
+            }
+          });
+        } else if (hasPortfolio === 'false') {
+          pipeline.push({
+            $match: {
+              $or: [
+                { 'profileInfo.portfolio': { $exists: true, $size: 0 } },  // Empty array
+                { 'profileInfo.portfolio': { $exists: false } },           // Field doesn't exist
+                { 'profileInfo': { $size: 0 } }                            // No profile found
+              ]
+            }
+          });
         }
-      };
+        // If hasPortfolio === 'any', we don't add an extra match condition
+
+        // Sort
+        pipeline.push({ $sort: sort });
+
+        // Skip and limit for pagination
+        pipeline.push({ $skip: skip });
+        pipeline.push({ $limit: parseInt(limit) });
+
+        // Perform population using lookup
+        pipeline.push({
+          $lookup: {
+            from: 'users',
+            localField: 'ownerId',
+            foreignField: '_id',
+            as: 'ownerId'
+          }
+        });
+
+        pipeline.push({
+          $lookup: {
+            from: 'categories',
+            localField: 'categoryId',
+            foreignField: '_id',
+            as: 'categoryId'
+          }
+        });
+
+        pipeline.push({
+          $lookup: {
+            from: 'tags',
+            localField: 'tags',
+            foreignField: '_id',
+            as: 'tags'
+          }
+        });
+
+        pipeline.push({
+          $lookup: {
+            from: 'profiles',
+            localField: 'profileId',
+            foreignField: '_id',
+            as: 'profileId'
+          }
+        });
+
+        // Format the data similar to populate
+        pipeline.push({
+          $addFields: {
+            'ownerId': { $arrayElemAt: ['$ownerId', 0] },
+            'categoryId': { $arrayElemAt: ['$categoryId', 0] },
+            'profileId': { $arrayElemAt: ['$profileId', 0] }
+          }
+        });
+
+        const advertisements = await Advertisement.aggregate(pipeline);
+
+        // For total count, we need a separate pipeline
+        const countPipeline = [];
+        countPipeline.push({ $match: filter });
+
+        if (hasPortfolio === 'true') {
+          countPipeline.push({
+            $lookup: {
+              from: 'profiles',
+              localField: 'profileId',
+              foreignField: '_id',
+              as: 'profileInfo'
+            }
+          });
+          countPipeline.push({
+            $match: {
+              $or: [
+                { 'profileInfo.portfolio.0': { $exists: true } }
+              ]
+            }
+          });
+        } else if (hasPortfolio === 'false') {
+          countPipeline.push({
+            $lookup: {
+              from: 'profiles',
+              localField: 'profileId',
+              foreignField: '_id',
+              as: 'profileInfo'
+            }
+          });
+          countPipeline.push({
+            $match: {
+              $or: [
+                { 'profileInfo.portfolio': { $exists: true, $size: 0 } },
+                { 'profileInfo.portfolio': { $exists: false } },
+                { 'profileInfo': { $size: 0 } }
+              ]
+            }
+          });
+        }
+
+        countPipeline.push({ $count: 'total' });
+        const countResult = await Advertisement.aggregate(countPipeline);
+        const total = countResult.length > 0 ? countResult[0].total : 0;
+
+        return {
+          advertisements,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            pages: Math.ceil(total / parseInt(limit)),
+            hasNext: parseInt(page) * parseInt(limit) < total,
+            hasPrev: parseInt(page) > 1
+          }
+        };
+      } else {
+        // Use regular find without hasPortfolio filter
+        // Get advertisements with filtering and sorting
+        const advertisements = await Advertisement.find(filter)
+          .populate('ownerId', 'firstName lastName email')
+          .populate('categoryId', 'name description')
+          .populate('tags', 'name')
+          .populate('profileId', 'firstName lastName')
+          .sort(sort)
+          .skip(skip)
+          .limit(parseInt(limit));
+
+        // Get total count for pagination
+        const total = await Advertisement.countDocuments(filter);
+
+        return {
+          advertisements,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            pages: Math.ceil(total / parseInt(limit)),
+            hasNext: parseInt(page) * parseInt(limit) < total,
+            hasPrev: parseInt(page) > 1
+          }
+        };
+      }
     } catch (error) {
       logger.error('Error during enhanced advertisement search:', error.message);
       throw error;

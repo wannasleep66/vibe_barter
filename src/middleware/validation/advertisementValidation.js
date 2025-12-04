@@ -115,7 +115,8 @@ const getAdvertisementsQuerySchema = Joi.object({
   sortOrder: Joi.string().valid('asc', 'desc').optional().default('desc'),
   longitude: Joi.number().min(-180).max(180).optional(), // For geo-location search
   latitude: Joi.number().min(-90).max(90).optional(),   // For geo-location search
-  maxDistance: Joi.number().min(0).optional().default(10000) // Max distance in meters for geo-search
+  maxDistance: Joi.number().min(0).optional().default(10000), // Max distance in meters for geo-search
+  hasPortfolio: Joi.string().valid('true', 'false', 'any').optional() // Filter by whether author has portfolio
 });
 
 // Validation schema for advertisement ID parameter

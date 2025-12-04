@@ -136,6 +136,7 @@ const advertisementController = {
         longitude,
         latitude,
         maxDistance,
+        hasPortfolio,
         sortBy = 'createdAt',
         sortOrder = 'desc'
       } = req.query;
@@ -201,6 +202,11 @@ const advertisementController = {
         if (maxCreatedAt) filter.createdAt.$lte = new Date(maxCreatedAt);
       }
 
+      // Portfolio filter - need to handle this specially since it requires joining with Profile
+      if (hasPortfolio !== undefined) {
+        // This will be handled in the query builder section below
+      }
+
       // Use enhanced search if search query is provided
       if (search) {
         const result = await SearchService.searchAdvertisements(search, {
@@ -211,7 +217,24 @@ const advertisementController = {
           tagId,
           location,
           isUrgent,
+          isArchived,
           isActive,
+          ownerId,
+          profileId,
+          minRating,
+          maxRating,
+          minViews,
+          maxViews,
+          minApplications,
+          maxApplications,
+          expiresBefore,
+          expiresAfter,
+          minCreatedAt,
+          maxCreatedAt,
+          hasPortfolio, // Add the hasPortfolio filter
+          longitude,
+          latitude,
+          maxDistance,
           sortBy,
           sortOrder
         });
@@ -220,7 +243,34 @@ const advertisementController = {
           success: true,
           data: result.advertisements,
           pagination: result.pagination,
-          filters: { search, type, categoryId, tagId, location, isUrgent, isActive, sortBy, sortOrder }
+          filters: {
+            search,
+            type,
+            categoryId,
+            tagId,
+            location,
+            isUrgent,
+            isArchived,
+            isActive,
+            ownerId,
+            profileId,
+            minRating,
+            maxRating,
+            minViews,
+            maxViews,
+            minApplications,
+            maxApplications,
+            expiresBefore,
+            expiresAfter,
+            minCreatedAt,
+            maxCreatedAt,
+            hasPortfolio, // Include hasPortfolio in filters
+            longitude,
+            latitude,
+            maxDistance,
+            sortBy,
+            sortOrder
+          }
         });
       } else {
         // For non-search queries, build the standard filter with geo-location if provided
@@ -299,6 +349,7 @@ const advertisementController = {
             expiresAfter,
             minCreatedAt,
             maxCreatedAt,
+            hasPortfolio,
             longitude,
             latitude,
             maxDistance,

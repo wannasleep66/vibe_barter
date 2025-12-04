@@ -44,6 +44,9 @@ GET /api/advertisements
 - `latitude` (number, optional): Latitude coordinate for location-based search
 - `maxDistance` (number, optional): Maximum distance in meters for location-based search (default: 10000)
 
+### Portfolio Filters
+- `hasPortfolio` (string, optional): Filter by whether the author has a portfolio ('true', 'false', 'any')
+
 ### Pagination and Sorting
 - `page` (number, optional): Page number (default: 1)
 - `limit` (number, optional): Limit per page (default: 10, max: 100)
@@ -75,6 +78,13 @@ GET /api/advertisements?longitude=-74.0060&latitude=40.7128&maxDistance=5000
 ### Combined Filters
 ````
 GET /api/advertisements?search=laptop&minRating=3&maxViews=500&category=electronics&page=1&limit=10
+` ``
+
+### Portfolio Filter Examples
+```
+GET /api/advertisements?hasPortfolio=true
+GET /api/advertisements?hasPortfolio=false
+GET /api/advertisements?hasPortfolio=any&location=New+York
 ` ``
 
 ## Notes
