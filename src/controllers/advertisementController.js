@@ -171,11 +171,24 @@ const advertisementController = {
       } = req.query;
 
       // Build filter object
-      const filter = { isActive: true }; // Only active by default
+      const filter = { isActive: true, isHidden: false }; // Only active and not hidden by default
 
       if (isActive !== 'any') {
         filter.isActive = isActive === 'true';
       }
+
+      // Allow filtering by hidden status as well
+      if (req.query.isHideStatus !== undefined) {
+        if (req.query.isHideStatus === 'any') {
+          delete filter.isHidden; // Remove isHidden filter to show all (hidden and visible)
+        } else {
+          filter.isHidden = req.query.isHideStatus === 'true';
+        }
+      } else if (req.query.showHidden === 'true') {
+        // If specifically told to show hidden ads, don't exclude them
+        delete filter.isHidden;
+      }
+      // Otherwise, filter.isHidden = false (which is already set above)
 
       // Allow filtering by archived status as well
       if (isArchived !== undefined) {
@@ -1194,6 +1207,54 @@ const advertisementController = {
       logger.error('Error searching tags:', error.message);
       next(error);
     }
+  }
+};
+
+// Get advertisement rating information
+advertisementController.getAdvertisementRating = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Import ReviewService here to avoid circular dependencies
+    const ReviewService = require('../services/ReviewService');
+
+    const ratingInfo = await ReviewService.getAdvertisementRatingInfo(id);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        advertisementId: id,
+        rating: ratingInfo
+      }
+    });
+  } catch (error) {
+    logger.error('Error getting advertisement rating:', error.message);
+    next(error);
+  }
+};
+
+// Report an advertisement as inappropriate
+advertisementController.reportAdvertisement = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason, details } = req.body;
+
+    const ModerationService = require('../services/ModerationService');
+
+    const report = await ModerationService.reportAdvertisement({
+      advertisementId: id,
+      reason,
+      details
+    }, req.user._id);
+
+    res.status(201).json({
+      success: true,
+      data: report,
+      message: 'Advertisement reported successfully'
+    });
+  } catch (error) {
+    logger.error('Error reporting advertisement:', error.message);
+    next(error);
   }
 };
 

@@ -81,4 +81,10 @@ router.get('/:id/rating',
   advertisementController.getAdvertisementRating
 );
 
+// Report an advertisement as inappropriate
+router.post('/:id/report',
+  validateAdvertisementId,
+  advertisementController.reportAdvertisement
+);
+
 module.exports = router;

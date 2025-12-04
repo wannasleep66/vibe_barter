@@ -87,6 +87,7 @@ app.use('/api/advertisement-tags', require('./routes/advertisementTags'));
 app.use('/api/advertisement-media', require('./routes/advertisementMedia'));
 app.use('/api/chats', require('./routes/chats'));
 app.use('/api/reviews', require('./routes/reviews'));
+app.use('/api/moderation', require('./routes/moderation'));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static('uploads'));

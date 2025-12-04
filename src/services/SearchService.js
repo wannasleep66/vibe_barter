@@ -105,11 +105,24 @@ class SearchService {
       } = options;
 
       // Build filter object
-      const filter = { isActive: true }; // Only active by default
+      const filter = { isActive: true, isHidden: false }; // Only active and not hidden by default
 
       if (isActive !== 'any') {
         filter.isActive = isActive === 'true';
       }
+
+      // For hidden status, we need to handle it appropriately
+      if (options.isHideStatus !== undefined) {
+        if (options.isHideStatus === 'any') {
+          delete filter.isHidden; // Remove isHidden filter to show all (hidden and visible)
+        } else {
+          filter.isHidden = options.isHideStatus === 'true';
+        }
+      } else if (options.showHidden === true) {
+        // If specifically told to show hidden ads, don't exclude them
+        delete filter.isHidden;
+      }
+      // Otherwise, filter.isHidden = false (which is already set above)
 
       if (isArchived !== undefined) {
         if (isArchived === 'any') {
